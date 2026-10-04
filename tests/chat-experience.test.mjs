@@ -23,6 +23,7 @@ test('onboarding keeps a single TYVON experience and strict bounds',()=>{
 test('equipment parsing is bounded to known options',()=>{
  assert.deepEqual(parseAnswer(step('equipment'),'Academia completa').value,['Halteres','Barras','Máquinas','Cabos','Banco']);
  assert.deepEqual(parseAnswer(step('equipment'),'só peso corporal').value,['Peso corporal']);
+ assert.deepEqual(parseAnswer(step('equipment'),'Halteres, Banco, Peso corporal').value,['Peso corporal','Halteres','Banco']);
  assert.ok(parseAnswer(step('equipment'),'qualquer coisa').error);
 });
 
