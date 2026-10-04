@@ -1,3 +1,5 @@
+> Revisão atual: [auditoria de 04/10 UTC](AUDIT-2026-10-04.md). Este benchmark descreve a análise anterior; a home e a persistência foram atualizadas na revisão atual.
+
 # TYVON Product Benchmark 2026
 
 Atualizado em outubro de 2026.

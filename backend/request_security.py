@@ -6,7 +6,7 @@ from flask import jsonify, request
 
 
 def canonical_origin():
-    configured = (os.getenv("PUBLIC_ORIGIN") or os.getenv("AUTH_BASE_URL") or "").strip().rstrip("/")
+    configured = (os.getenv("PUBLIC_ORIGIN") or os.getenv("AUTH_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
     return configured or request.host_url.rstrip("/")
 
 

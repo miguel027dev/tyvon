@@ -89,10 +89,10 @@ def validate_account_state(raw, email):
                     try:
                         reps = min(100, max(0, int(float(raw_set.get("reps") or 0))))
                         weight = min(500, max(0, float(raw_set.get("weight") or 0)))
-                        rir = min(5, max(0, float(raw_set.get("rir") if raw_set.get("rir") is not None else 2)))
-                        target_rir = min(5, max(0, float(raw_set.get("targetRir") if raw_set.get("targetRir") is not None else rir)))
+                        rir = min(5, max(0, float(raw_set["rir"]))) if raw_set.get("rir") is not None else None
+                        target_rir = min(5, max(0, float(raw_set["targetRir"]))) if raw_set.get("targetRir") is not None else None
                         set_index = min(20, max(1, int(float(raw_set.get("setIndex") or 1))))
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError, OverflowError):
                         continue
                     set_logs.append({
                         "exerciseId": clean_text(raw_set.get("exerciseId"), 80),
@@ -113,10 +113,12 @@ def validate_account_state(raw, email):
                 mode = clean_text(item["feedback"].get("mode"), 20)
                 if mode in {"detailed", "chat"}:
                     feedback["mode"] = mode
+                if isinstance(item["feedback"].get("partial"), bool):
+                    feedback["partial"] = item["feedback"]["partial"]
             try:
                 minutes = min(600, max(1, float(item.get("minutes") or 1)))
                 sets = min(300, max(0, float(item.get("sets") or 0)))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 continue
             logs.append({
                 "id": log_id,
@@ -171,8 +173,8 @@ def load_state(conn, user_id, email):
                     "setIndex": row["set_index"],
                     "weight": float(row["weight"] or 0),
                     "reps": int(row["reps"] or 0),
-                    "rir": float(row["rir"] or 0),
-                    "targetRir": float(row["target_rir"] or 0),
+                    "rir": float(row["rir"]) if row["rir"] is not None else None,
+                    "targetRir": float(row["target_rir"]) if row["target_rir"] is not None else None,
                     "completed": bool(row["completed"]),
                 })
 
@@ -223,10 +225,12 @@ def persist_state(conn, user_id, email, raw, expected_revision=None, migration_m
     messages_hash = _json_hash(state["messages"])
     logs_hash = _json_hash(state["logs"])
     with conn.cursor() as cur:
+        # Lock the parent row too: the metadata row may not exist on first save.
+        cur.execute("SELECT id FROM tyvon_users WHERE id=%s FOR UPDATE", (user_id,))
         cur.execute("SELECT revision,messages_hash,logs_hash FROM tyvon_account_meta WHERE user_id=%s FOR UPDATE", (user_id,))
         meta = cur.fetchone()
         current_revision = int(meta["revision"]) if meta else 0
-        if expected_revision is not None and meta and int(expected_revision) != current_revision:
+        if expected_revision is not None and int(expected_revision) != current_revision:
             raise RevisionConflict(current_revision)
 
         p = state["profile"]
@@ -333,7 +337,7 @@ def account():
             return jsonify({"error": "Seu histórico está muito grande."}), 413
         try:
             raw = json.loads(raw_bytes)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return jsonify({"error": "Dados inválidos."}), 400
 
         if request.method == "POST":

@@ -8,7 +8,7 @@
     "prebuild": "npm run test:frontend && python -m pytest -q",
     "build": "vite build",
     "test": "npm run test:frontend && python -m pytest -q",
-    "test:frontend": "node --test tests/chat-experience.test.mjs tests/workouts.test.mjs",
+    "test:frontend": "node --test tests/*.test.mjs",
     "test:backend": "python -m pytest -q"
   },
   "dependencies": {

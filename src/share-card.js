@@ -11,7 +11,7 @@ function insightSvg(workout,log,name){
  const duration=esc(formatMinutes(log?.minutes));
  const sets=Math.round(Number(log?.sets)||0);
  const setLogs=Array.isArray(log?.setLogs)?log.setLogs:[];
- const reps=setLogs.reduce((sum,item)=>sum+Math.max(0,Number(item?.reps)||0),0);
+ const reps=setLogs.filter(item=>item.exerciseId!=='plank'&&!/prancha|plank/i.test(item.exerciseName||'')).reduce((sum,item)=>sum+Math.max(0,Number(item?.reps)||0),0);
  const groups=[...new Set(setLogs.map(s=>s.group).filter(Boolean))].slice(0,4);
  const exercises=[...new Set(setLogs.map(s=>s.exerciseName).filter(Boolean))].slice(0,5);
  const groupsText=esc(groups.join(' · ')||workout?.focus||'Treino registrado');

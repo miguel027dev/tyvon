@@ -23,6 +23,8 @@ import './refinement.css';
 import './chat-refinement.css';
 import './workout-experience.css';
 import './production.css';
+import './quick-start.css';
+import {workoutDraftKey,readWorkoutDraft,clearWorkoutDraft,chatWorkoutDraftKey,readChatWorkoutDraft} from './workout-draft.js';
 
 const nav=[
  ['overview','Visão geral',LayoutDashboard],
@@ -38,7 +40,7 @@ function loadLegacy(){
  try{
   const current=localStorage.getItem('tyvon-validation')||localStorage.getItem('tyvon-validation-v1'),legacy=localStorage.getItem('rep-validation-v1');
   const parsed=JSON.parse(current||legacy||'null');
-  
+
   return parsed;
  }catch{return null}
 }
@@ -51,14 +53,18 @@ class ErrorBoundary extends React.Component{
 }
 
 function App(){
- const legacy=useRef(loadLegacy());
+ const legacy=useRef(loadLegacy()),finalizing=useRef(false),pendingFinalLog=useRef(null);
  const [profile,setProfile]=useState(null),[logs,setLogs]=useState([]),[messages,setMessages]=useState([]),[step,setStep]=useState(0);
  const [user,setUser]=useState(null),[route,setRoute]=useState('entry'),[mobile,setMobile]=useState(false),[toast,setToast]=useState('');
- const [activeWorkout,setActiveWorkout]=useState(null),[planReveal,setPlanReveal]=useState(null),[onboard,setOnboard]=useState(false),[chatRequest,setChatRequest]=useState(null);
+ const [activeWorkout,setActiveWorkout]=useState(null),[sessionDraft,setSessionDraft]=useState(null),[planReveal,setPlanReveal]=useState(null),[onboard,setOnboard]=useState(false),[chatRequest,setChatRequest]=useState(null);
  const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(''),[ready,setReady]=useState(false),[showSplash,setShowSplash]=useState(true);
  const p=profile?{...sampleProfile,...profile}:sampleProfile;
- const plan=makePlan(p),lastIndex=logs.length?plan.findIndex(w=>w.name===logs.at(-1)?.name):-1,nextWorkoutId=plan.length?(lastIndex>=0?(lastIndex+1)%plan.length:0):0;
- const storage=useAccountStore({profile,logs,messages,step},ready&&!!user);
+ const plan=makePlan(p),lastIndex=logs.length?plan.findIndex(w=>w.id===logs.at(-1)?.workoutId||w.name===(logs.at(-1)?.workoutName||logs.at(-1)?.name?.replace(/ · parcial$/,''))):-1,nextWorkoutId=plan.length?(lastIndex>=0?(lastIndex+(logs.at(-1)?.feedback?.partial||logs.at(-1)?.name?.endsWith(' · parcial')?0:1))%plan.length:0):0;
+ const draftKey=workoutDraftKey(user?.id);
+ const draft=readWorkoutDraft(localStorage,draftKey);
+ const chatDraft=readChatWorkoutDraft(localStorage,chatWorkoutDraftKey(user?.id));
+ const resumeDraft=draft||(chatDraft?{workout:chatDraft.workout,checked:Object.fromEntries(chatDraft.setLogs.map((_,i)=>[i,true]))}:null);
+ const storage=useAccountStore({profile,logs,messages,step},ready&&!!user,user?.id);
  const dismissSplash=useCallback(()=>setShowSplash(false),[]);
 
  function hydrate(state){
@@ -105,24 +111,46 @@ function App(){
   const completeProfile={...next,complete:true};
   setProfile(completeProfile);setOnboard(false);notify('Seu plano está pronto.');setTimeout(()=>setPlanReveal(completeProfile),450);
  }
- function persistWorkoutLog(log){
-  const saved={...log,engine:'tyvon',setLogs:log.setLogs||[],feedback:log.feedback||{},date:new Date().toISOString(),id:crypto.randomUUID()};
-  setLogs(prev=>[...prev,saved]);return saved;
+ function workoutLog(log){return {...log,engine:'tyvon',setLogs:log.setLogs||[],feedback:log.feedback||{},date:new Date().toISOString(),id:crypto.randomUUID()}}
+ function startWorkout(workout){
+  const saved=readWorkoutDraft(localStorage,draftKey);
+  if(readChatWorkoutDraft(localStorage,chatWorkoutDraftKey(user?.id))){notify("Seu treino está em andamento no chat.");go("chat");return}
+  if(saved&&saved.workout.id!==workout.id){notify("Continue ou encerre o treino em andamento antes de começar outra ficha.");setSessionDraft(saved);setActiveWorkout(saved.workout);return}
+  setSessionDraft(saved);setActiveWorkout(saved?.workout||workout);
  }
- function finish(log){
-  persistWorkoutLog(log);setActiveWorkout(null);go('analytics');notify('Treino registrado.');
+ function resumeWorkout(){if(readChatWorkoutDraft(localStorage,chatWorkoutDraftKey(user?.id))){go("chat");return}const saved=readWorkoutDraft(localStorage,draftKey);if(saved){setSessionDraft(saved);setActiveWorkout(saved.workout)}}
+ async function finish(log){
+  if(finalizing.current)return false;
+  finalizing.current=true;
+  const saved=pendingFinalLog.current||workoutLog(log);pendingFinalLog.current=saved;
+  const nextLogs=logs.some(item=>item.id===saved.id)?logs:[...logs,saved];
+  setLogs(nextLogs);
+  try{
+   await storage.flush({profile,logs:nextLogs,messages,step});
+   setLogs(prev=>prev.some(item=>item.id===saved.id)?prev:[...prev,saved]);
+   clearWorkoutDraft(localStorage,draftKey);setSessionDraft(null);pendingFinalLog.current=null;
+   setActiveWorkout(null);go('analytics');notify('Treino registrado.');return true;
+  }catch(error){notify(error.message||'Não foi possível salvar. Seu treino continua aqui para tentar novamente.');return false}
+  finally{finalizing.current=false}
  }
- function finishChatWorkout(log){
-  persistWorkoutLog(log);notify('Treino registrado pelo chat.');
+ async function finishChatWorkout(log){
+  if(finalizing.current)return false;
+  finalizing.current=true;
+  const saved=pendingFinalLog.current||workoutLog(log);pendingFinalLog.current=saved;
+  const nextLogs=logs.some(item=>item.id===saved.id)?logs:[...logs,saved];
+  setLogs(nextLogs);
+  try{await storage.flush({profile,logs:nextLogs,messages,step});setLogs(prev=>prev.some(item=>item.id===saved.id)?prev:[...prev,saved]);pendingFinalLog.current=null;notify('Treino registrado pelo chat.');return true}
+  catch(error){notify(error.message||'Salvamento pendente. Tente registrar a última série novamente.');return false}
+  finally{finalizing.current=false}
  }
  async function reset(){
-  await storage.flush();await accountRequest('DELETE');resetAccountRevision();hydrate(null);go('entry');notify('Seu perfil foi apagado.');
+  await storage.flush();await accountRequest('DELETE');pendingFinalLog.current=null;clearWorkoutDraft(localStorage,draftKey);clearWorkoutDraft(localStorage,chatWorkoutDraftKey(user?.id));resetAccountRevision();hydrate(null);go('entry');notify('Seu perfil foi apagado.');
  }
  async function signOut(){
   await storage.flush();
   const response=await apiFetch('/api/auth/logout',{method:'POST'});
   if(!response.ok)throw new Error('Não foi possível encerrar sua sessão.');
-  resetAccountRevision();setUser(null);hydrate(null);setRoute('entry');requestAnimationFrame(()=>window.scrollTo(0,0));
+  pendingFinalLog.current=null;clearWorkoutDraft(localStorage,draftKey);clearWorkoutDraft(localStorage,chatWorkoutDraftKey(user?.id));resetAccountRevision();setUser(null);hydrate(null);setRoute('entry');requestAnimationFrame(()=>window.scrollTo(0,0));
  }
  async function authenticate(mode,body){
   const response=await apiFetch('/api/auth/'+mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -141,18 +169,19 @@ function App(){
   <aside className={'sidebar '+(mobile?'open':'')}><div className="brand"><Logo/><span className="brand-sub">BUILT AROUND YOU</span></div><div className="nav-label">SEU ESPAÇO</div><nav>{nav.map(([id,label,Icon])=><button key={id} aria-label={label} aria-current={route===id?'page':undefined} className={'nav-item '+(route===id?'selected':'')} onClick={()=>go(id)}><Icon size={19}/><span>{label}</span>{id==='chat'&&<span className="ai-tag">AI</span>}</button>)}</nav><div className="sidebar-bottom"><button className="sidebar-user" onClick={()=>go('profile')}><Avatar name={p.name}/><span><strong>{p.name}</strong><small>TYVON · Performance</small></span><ChevronDown size={15}/></button></div></aside>
   {mobile&&<button className="mobile-shade" aria-label="Fechar menu" onClick={()=>setMobile(false)}/>}
   <div className="workspace"><header className="topbar"><div className="breadcrumb"><div className="mobile-brand"><Logo/></div><button className="mobile-menu" aria-label="Abrir menu" onClick={()=>setMobile(true)}><Menu size={22}/></button><span>Meu espaço</span><ChevronRight size={13}/><strong>{nav.find(n=>n[0]===route)?.[1]}</strong></div><div className="top-actions"><span className="demo-badge"><span/>{storage.status==='saving'?'Salvando…':storage.status==='error'?'Salvamento pendente':'Salvo na sua conta'}</span><button className="header-avatar" aria-label="Abrir perfil" onClick={()=>go('profile')}><Avatar name={p.name}/></button></div></header>
+   {storage.error&&<div className="account-save-alert" role="alert"><span>{storage.error}{storage.error.includes('outra aba')&&<small> Alterações locais pendentes não serão aplicadas ao recarregar.</small>}</span><button onClick={()=>storage.error.includes('outra aba')?location.reload():storage.retry()}>{storage.error.includes('outra aba')?'Recarregar conta':'Tentar salvar novamente'}</button></div>}
    <main><AnimatePresence mode="wait"><motion.div key={route} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.18}}>
-    {route==='overview'&&<Home p={p} plan={plan} logs={logs} go={go} start={setActiveWorkout} ask={ask} nextWorkoutId={nextWorkoutId}/>}
-    {route==='chat'&&<Chat request={chatRequest} clearRequest={()=>setChatRequest(null)} profile={profile} p={p} setProfile={setProfile} messages={messages} setMessages={setMessages} onboard={onboard} step={step} setStep={setStep} completed={completed} plan={plan} go={go} saveStatus={storage.status} start={setActiveWorkout} nextWorkoutId={nextWorkoutId} onWorkoutComplete={finishChatWorkout}/>} 
-    {route==='workouts'&&<WorkoutsPage p={p} plan={plan} start={setActiveWorkout}/>}
+    {route==='overview'&&<Home p={p} plan={plan} logs={logs} go={go} start={startWorkout} ask={ask} nextWorkoutId={nextWorkoutId} draft={resumeDraft} onResume={resumeWorkout}/>}
+    {route==='chat'&&<Chat request={chatRequest} clearRequest={()=>setChatRequest(null)} profile={profile} p={p} setProfile={setProfile} messages={messages} setMessages={setMessages} onboard={onboard} step={step} setStep={setStep} completed={completed} plan={plan} go={go} saveStatus={storage.status} start={startWorkout} nextWorkoutId={nextWorkoutId} onWorkoutComplete={finishChatWorkout} userId={user?.id}/>}
+    {route==='workouts'&&<WorkoutsPage p={p} plan={plan} start={startWorkout}/>}
     {route==='analytics'&&<AnalyticsPage logs={logs} go={go}/>}
     {route==='profile'&&<ProfilePage p={p} user={user} logs={logs} setProfile={setProfile} notify={notify} reset={reset} signOut={signOut}/>}
    </motion.div></AnimatePresence></main>
    <footer><Logo small/><span>TYVON · PERFORMANCE</span><span className="footer-right">TYVON · PRIVACIDADE POR PADRÃO</span></footer>
   </div>
   <AppDock items={nav} selected={route} onChange={go}/>
-  <AnimatePresence>{activeWorkout&&<WorkoutSession workout={activeWorkout} logs={logs} profile={p} athleteName={p.name} finish={finish} close={()=>setActiveWorkout(null)} restricted={p.limitations&&p.limitations!=='Nenhuma'}/>}</AnimatePresence>
-  <AnimatePresence>{planReveal&&<WorkoutReveal profile={planReveal} plan={makePlan(planReveal)} onStart={w=>{setPlanReveal(null);setActiveWorkout(w)}} onClose={()=>{setPlanReveal(null);go('overview')}}/>}</AnimatePresence>
+  <AnimatePresence>{activeWorkout&&<WorkoutSession draftKey={draftKey} draft={sessionDraft} workout={activeWorkout} logs={logs} profile={p} athleteName={p.name} finish={finish} close={()=>{if(finalizing.current)return;pendingFinalLog.current=null;clearWorkoutDraft(localStorage,draftKey);setSessionDraft(null);setActiveWorkout(null)}} restricted={p.limitations&&p.limitations!=='Nenhuma'}/>}</AnimatePresence>
+  <AnimatePresence>{planReveal&&<WorkoutReveal profile={planReveal} plan={makePlan(planReveal)} onStart={w=>{setPlanReveal(null);startWorkout(w)}} onClose={()=>{setPlanReveal(null);go('overview')}}/>}</AnimatePresence>
   {toast&&<div className="toast" role="status">{toast}</div>}
  </div></>;
 }

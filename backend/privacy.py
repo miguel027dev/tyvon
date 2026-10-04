@@ -6,7 +6,7 @@ import secrets
 import requests
 from flask import Blueprint, jsonify, request
 
-from .auth import resolve_identity
+from .auth import action_rate_limit, credentials_body, resolve_identity
 from .db import get_db
 from .logging_utils import log_event
 from .request_security import require_csrf, same_origin_ok
@@ -34,7 +34,9 @@ def create_privacy_request():
         return jsonify({"error": "Origem não permitida."}), 403
     if "application/json" not in (request.content_type or ""):
         return jsonify({"error": "Envie a solicitação em JSON."}), 415
-    body = request.get_json(silent=True) or {}
+    body, error = credentials_body()
+    if error:
+        return error
     email = str(body.get("email") or "").strip().lower()[:254]
     kind = str(body.get("kind") or "").strip()
     details = str(body.get("details") or "").strip()[:4000]
@@ -46,8 +48,12 @@ def create_privacy_request():
         return jsonify({"error": "Descreva sua solicitação."}), 400
 
     user = resolve_identity()
+    if user and (not user.get("email_verified") or user["email"] != email):
+        user = None
     protocol = "TYVON-LGPD-" + secrets.token_hex(5).upper()
     with get_db() as conn, conn.cursor() as cur:
+        if not action_rate_limit(conn, "privacy_request", email, limit=5, window_ms=86400000):
+            return jsonify({"error": "Limite de solicitações atingido. Tente novamente mais tarde."}), 429
         cur.execute(
             "SELECT COUNT(*) AS total FROM tyvon_privacy_requests WHERE email=%s AND created_at>NOW()-INTERVAL '24 hours'",
             (email,),
@@ -82,10 +88,10 @@ def my_privacy_requests():
         cur.execute("""
           SELECT id,kind,status,created_at,updated_at
           FROM tyvon_privacy_requests
-          WHERE user_id=%s OR email=%s
+          WHERE user_id=%s OR (email=%s AND %s)
           ORDER BY created_at DESC
           LIMIT 30
-        """, (user["id"], user["email"]))
+        """, (user["id"], user["email"], bool(user.get("email_verified"))))
         items = [{
             "protocol": row["id"],
             "kind": row["kind"],
@@ -102,7 +108,9 @@ def update_privacy_request(protocol):
     supplied = request.headers.get("X-Privacy-Admin-Token", "")
     if not admin_token or not supplied or not hmac.compare_digest(admin_token, supplied):
         return jsonify({"error": "Acesso não autorizado."}), 401
-    body = request.get_json(silent=True) or {}
+    body, error = credentials_body()
+    if error:
+        return error
     status = str(body.get("status") or "").strip()
     if status not in {"received", "in_review", "completed", "rejected"}:
         return jsonify({"error": "Status inválido."}), 400

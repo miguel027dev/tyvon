@@ -82,21 +82,28 @@ def new_session(user_id):
     return token
 
 
-def action_rate_limit(conn, purpose, identity, limit=3, window_ms=3600000):
-    key = digest("action|" + purpose + "|" + identity + "|" + (request.remote_addr or "unknown"))
+def consume_rate_limit(conn, key, limit, window_ms):
+    """Atomically reserve an attempt, including concurrent first requests."""
     now = now_ms()
     with conn.cursor() as cur:
-        cur.execute("SELECT attempts,expires_at FROM tyvon_auth_limits WHERE id=%s", (key,))
-        row = cur.fetchone()
-        if row and row["expires_at"] > now and row["attempts"] >= limit:
-            return False
         cur.execute("""
           INSERT INTO tyvon_auth_limits(id,attempts,expires_at) VALUES(%s,1,%s)
           ON CONFLICT(id) DO UPDATE SET
-            attempts=CASE WHEN tyvon_auth_limits.expires_at<=%s THEN 1 ELSE tyvon_auth_limits.attempts+1 END,
+            attempts=CASE WHEN tyvon_auth_limits.expires_at<=%s THEN 1 ELSE LEAST(tyvon_auth_limits.attempts+1,%s) END,
             expires_at=CASE WHEN tyvon_auth_limits.expires_at<=%s THEN EXCLUDED.expires_at ELSE tyvon_auth_limits.expires_at END
-        """, (key, now + window_ms, now, now))
-    return True
+          RETURNING attempts
+        """, (key, now + window_ms, now, limit + 1, now))
+        return cur.fetchone()["attempts"] <= limit
+
+
+def action_rate_limit(conn, purpose, identity, limit=3, window_ms=3600000):
+    # Both dimensions are necessary: changing email must not bypass the IP limit,
+    # and changing IP must not bypass the per-address delivery quota.
+    ip_key = digest("action-ip|" + purpose + "|" + (request.remote_addr or "unknown"))
+    identity_key = digest("action-email|" + purpose + "|" + identity)
+    if not consume_rate_limit(conn, ip_key, max(15, limit * 5), window_ms):
+        return False
+    return consume_rate_limit(conn, identity_key, limit, window_ms)
 
 
 def google_configured():
@@ -122,19 +129,10 @@ def credentials_body():
 
 def auth_rate_limit(conn, email):
     key = digest(email + "|" + (request.remote_addr or "unknown"))
-    now = now_ms()
-    with conn.cursor() as cur:
-        cur.execute("SELECT attempts,expires_at FROM tyvon_auth_limits WHERE id=%s", (key,))
-        rate = cur.fetchone()
-        if rate and rate["expires_at"] > now and rate["attempts"] >= 8:
-            return False, key
-        cur.execute("""
-          INSERT INTO tyvon_auth_limits(id,attempts,expires_at) VALUES(%s,1,%s)
-          ON CONFLICT(id) DO UPDATE SET
-            attempts=CASE WHEN tyvon_auth_limits.expires_at<=%s THEN 1 ELSE tyvon_auth_limits.attempts+1 END,
-            expires_at=CASE WHEN tyvon_auth_limits.expires_at<=%s THEN EXCLUDED.expires_at ELSE tyvon_auth_limits.expires_at END
-        """, (key, now + 900000, now, now))
-    return True, key
+    ip_key = digest("auth-ip|" + (request.remote_addr or "unknown"))
+    if not consume_rate_limit(conn, ip_key, 40, 900000):
+        return False, key
+    return consume_rate_limit(conn, key, 8, 900000), key
 
 
 @auth_bp.get("/status")
@@ -212,12 +210,19 @@ def google_callback():
         email = str(person["email"]).strip().lower()
         name = str(person.get("given_name") or "")[:40]
         with get_db() as conn, conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (email,))
             cur.execute("SELECT * FROM tyvon_users WHERE google_sub=%s", (person["sub"],))
             user = cur.fetchone()
             if not user:
                 cur.execute("SELECT * FROM tyvon_users WHERE email=%s ORDER BY (password_hash IS NOT NULL) DESC, created_at ASC LIMIT 1", (email,))
                 user = cur.fetchone()
                 if user:
+                    if not user["email_verified"]:
+                        # A pre-registered unverified password is not proof of ownership.
+                        # Remove it and revoke every pre-existing access path before linking.
+                        cur.execute("UPDATE tyvon_users SET password_hash=NULL,salt=NULL,password_algo=NULL WHERE id=%s", (user["id"],))
+                        cur.execute("DELETE FROM tyvon_sessions WHERE user_id=%s", (user["id"],))
+                        cur.execute("DELETE FROM tyvon_email_tokens WHERE user_id=%s", (user["id"],))
                     cur.execute(
                         "UPDATE tyvon_users SET google_sub=%s,email_verified=TRUE,name=CASE WHEN name='' THEN %s ELSE name END,updated_at=NOW() WHERE id=%s",
                         (person["sub"], name, user["id"]),
@@ -255,9 +260,12 @@ def verify_email():
 
 @auth_bp.post("/resend-verification")
 def resend_verification():
-    if not same_origin_ok():
-        return jsonify({"error": "Origem não permitida."}), 403
-    body = request.get_json(silent=True) or {}
+    csrf_error = require_csrf()
+    if csrf_error:
+        return csrf_error
+    body, error = credentials_body()
+    if error:
+        return error
     email = str(body.get("email") or "").strip().lower()
     if EMAIL_RE.match(email):
         with get_db() as conn:
@@ -266,16 +274,20 @@ def resend_verification():
             with conn.cursor() as cur:
                 cur.execute("SELECT id,email_verified FROM tyvon_users WHERE email=%s AND password_hash IS NOT NULL LIMIT 1", (email,))
                 user = cur.fetchone()
-        sent = bool(user and not user["email_verified"] and send_verification(user["id"], email))
-        return jsonify({"ok": True, "sent": sent, "message": "Se houver uma conta pendente e o envio estiver disponível, enviaremos um novo link."})
+        if user and not user["email_verified"]:
+            send_verification(user["id"], email)
+        return jsonify({"ok": True, "sent": email_configured(), "message": "Se houver uma conta pendente e o envio estiver disponível, enviaremos um novo link."})
     return jsonify({"ok": True, "sent": False, "message": "Se houver uma conta pendente e o envio estiver disponível, enviaremos um novo link."})
 
 
 @auth_bp.post("/forgot-password")
 def forgot_password():
-    if not same_origin_ok():
-        return jsonify({"error": "Origem não permitida."}), 403
-    body = request.get_json(silent=True) or {}
+    csrf_error = require_csrf()
+    if csrf_error:
+        return csrf_error
+    body, error = credentials_body()
+    if error:
+        return error
     email = str(body.get("email") or "").strip().lower()
     if EMAIL_RE.match(email):
         with get_db() as conn:
@@ -291,9 +303,12 @@ def forgot_password():
 
 @auth_bp.post("/reset-password")
 def reset_password():
-    if not same_origin_ok():
-        return jsonify({"error": "Origem não permitida."}), 403
-    body = request.get_json(silent=True) or {}
+    csrf_error = require_csrf()
+    if csrf_error:
+        return csrf_error
+    body, error = credentials_body()
+    if error:
+        return error
     password = body.get("password")
     if not isinstance(password, str) or not 10 <= len(password) <= 128:
         return jsonify({"error": "Use uma senha de 10 a 128 caracteres."}), 400
@@ -302,7 +317,7 @@ def reset_password():
         return jsonify({"error": "Este link expirou ou já foi usado."}), 400
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
-            "UPDATE tyvon_users SET password_hash=%s,password_algo='argon2id',salt=NULL,updated_at=NOW() WHERE id=%s",
+            "UPDATE tyvon_users SET password_hash=%s,password_algo='argon2id',salt=NULL,email_verified=TRUE,updated_at=NOW() WHERE id=%s",
             (hash_password(password), user_id),
         )
         cur.execute("DELETE FROM tyvon_sessions WHERE user_id=%s", (user_id,))
@@ -325,8 +340,9 @@ def logout():
 
 
 def auth_action(mode):
-    if not same_origin_ok():
-        return jsonify({"error": "Origem não permitida."}), 403
+    csrf_error = require_csrf()
+    if csrf_error:
+        return csrf_error
     body, error = credentials_body()
     if error:
         return error
@@ -340,28 +356,21 @@ def auth_action(mode):
         if not allowed:
             return jsonify({"error": "Muitas tentativas. Aguarde 15 minutos.", "code": "RATE_LIMIT"}), 429
         with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (email,))
             cur.execute("SELECT * FROM tyvon_users WHERE email=%s ORDER BY (password_hash IS NOT NULL) DESC, created_at ASC LIMIT 1", (email,))
             user = cur.fetchone()
             if mode == "register":
                 if body.get("accepted") is not True:
                     return jsonify({"error": "Confirme que você tem pelo menos 14 anos e aceita os Termos e a Política de Privacidade."}), 400
-                if user and user.get("password_hash"):
-                    return jsonify({"error": "Este e-mail já tem uma conta. Entre com sua senha."}), 409
-                password_value = hash_password(password)
                 if user:
-                    user = dict(user)
-                    cur.execute(
-                        "UPDATE tyvon_users SET password_hash=%s,password_algo='argon2id',salt=NULL,updated_at=NOW() WHERE id=%s",
-                        (password_value, user["id"]),
-                    )
-                    user["password_hash"] = password_value
-                else:
-                    user_id = "tyvon_" + str(uuid.uuid4())
-                    cur.execute(
-                        "INSERT INTO tyvon_users(id,email,name,provider,password_hash,password_algo,email_verified) VALUES(%s,%s,'','password',%s,'argon2id',FALSE)",
-                        (user_id, email, password_value),
-                    )
-                    user = {"id": user_id, "email": email, "name": "", "provider": "password", "email_verified": False, "password_hash": password_value}
+                    return jsonify({"error": "Este e-mail já tem uma conta. Entre com sua senha ou Google; use a recuperação se necessário."}), 409
+                password_value = hash_password(password)
+                user_id = "tyvon_" + str(uuid.uuid4())
+                cur.execute(
+                    "INSERT INTO tyvon_users(id,email,name,provider,password_hash,password_algo,email_verified) VALUES(%s,%s,'','password',%s,'argon2id',FALSE)",
+                    (user_id, email, password_value),
+                )
+                user = {"id": user_id, "email": email, "name": "", "provider": "password", "email_verified": False, "password_hash": password_value}
                 cur.execute(
                     "INSERT INTO tyvon_consents(user_id,terms_version,privacy_version,sensitive_personalization) VALUES(%s,%s,%s,FALSE) ON CONFLICT(user_id) DO NOTHING",
                     (user["id"], TERMS_VERSION, PRIVACY_VERSION),

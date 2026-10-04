@@ -1,0 +1,28 @@
+/* One clear action: train first, contextual coaching second. */
+.tyvon-home-training-first .home-heading{margin-bottom:18px}
+.tyvon-home-training-first .home-heading h1{font-size:clamp(26px,4vw,34px);margin:8px 0}
+.tyvon-home-training-first .home-workout-copy h2{font-size:clamp(23px,3vw,30px)}
+.tyvon-home-training-first .home-workout-meta{margin:14px 0}
+.home-ready-note{font-size:11px;text-align:center;color:#a1a1a9;margin:10px 0 18px}
+.tyvon-home-training-first .home-conversation{margin:20px 0 0;padding:22px 24px}
+.tyvon-home-training-first .home-conversation-heading{margin-bottom:12px}
+.tyvon-home-training-first .home-conversation-heading h2{font-size:23px}
+.tyvon-home-training-first .home-conversation-heading .tyvon-bot{width:58px;height:64px}
+.tyvon-home-training-first .home-chat-entry{min-height:52px;font-size:15px}
+.home-resume{border:1px solid #626269;background:#18181b;border-radius:20px;padding:20px 24px;margin-bottom:18px;display:flex;gap:20px;align-items:center;justify-content:space-between}
+.home-resume strong{display:block;font-size:21px;margin:6px 0}
+.home-resume p{font-size:12px;color:#a4a4ac}
+.home-resume .home-primary{width:auto;min-width:180px;padding:12px 18px}
+.chat-quick-workout{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid #3b3b42;background:#151518;border-radius:16px;padding:14px 16px;margin-bottom:12px}
+.chat-quick-workout span,.chat-quick-workout small{display:block;color:#a0a0a9;font-size:10px}
+.chat-quick-workout span{letter-spacing:.1em}
+.chat-quick-workout strong{display:block;font-size:15px;line-height:1.4;margin:5px 0}
+.chat-quick-workout button{display:flex;align-items:center;justify-content:center;gap:8px;background:#eee;color:#111;border-radius:11px;min-height:44px;padding:10px 14px;font-size:12px;font-weight:600;white-space:nowrap}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid #ddd;outline-offset:3px}
+@media(max-width:700px){.tyvon-home-training-first .home-week-summary{display:none}.home-resume{padding:18px;align-items:stretch;flex-direction:column;gap:12px}.home-resume .home-primary{width:100%}.tyvon-home-training-first .home-section-label{padding-top:16px}.tyvon-home-training-first .home-session-tabs{padding-bottom:12px}.tyvon-home-training-first .home-workout{padding-top:16px}.chat-quick-workout{padding:12px;gap:10px}.chat-quick-workout strong{font-size:13px}.chat-quick-workout button{font-size:11px;padding:10px}.tyvon-home-training-first .home-conversation{padding:18px}}
+@media(max-width:350px){.chat-quick-workout{align-items:stretch;flex-direction:column}.chat-quick-workout button{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
+.account-save-alert{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:14px 24px 0;border:1px solid #64646b;border-radius:14px;background:#202023;padding:14px 16px;font-size:12px;line-height:1.5}
+.account-save-alert button{flex-shrink:0;border:1px solid #777;border-radius:10px;padding:10px 12px;min-height:44px;color:#fff}
+@media(max-width:700px){.account-save-alert{margin:12px;align-items:stretch;flex-direction:column}.chat-active .account-save-alert{position:fixed;left:8px;right:8px;top:58px;z-index:120;background:#202023}.account-save-alert button{width:100%}}
+.session-input-error{padding:12px 14px;border:1px solid #777;border-radius:12px;color:#eee;font-size:13px;margin-bottom:12px;line-height:1.5}

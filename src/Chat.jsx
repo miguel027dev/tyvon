@@ -9,6 +9,7 @@ import WorkoutCards from './WorkoutCards';
 import {makePlan,selectWorkoutCards,sanitizeWorkoutCards} from '../shared/workouts.js';
 import {steps,parseAnswer,coachReply,onboardingQuestion} from './logic';
 import {apiFetch} from './api.js';
+import {chatWorkoutDraftKey,readChatWorkoutDraft,clearWorkoutDraft} from './workout-draft.js';
 
 function plainResponse(text,cards){return readableResponse(text,{fallback:cards?.length?'Seu treino está nos cards abaixo.':''})}
 const clean=text=>String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -18,12 +19,13 @@ const weightFrom=text=>{const m=String(text||'').match(/(\d+(?:[.,]\d+)?)\s*(?:k
 const firstTarget=target=>{const m=String(target||'').match(/\d+/);return m?Number(m[0]):1};
 const format=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`;
 
-export default function Chat({request,clearRequest,profile,p,setProfile,messages,setMessages,onboard,step,setStep,completed,plan,go,saveStatus,start,nextWorkoutId=0,onWorkoutComplete}){
+export default function Chat({request,clearRequest,profile,p,setProfile,messages,setMessages,onboard,step,setStep,completed,plan,go,saveStatus,start,nextWorkoutId=0,onWorkoutComplete,userId}){
  const [busy,setBusy]=useState(false),[thinking,setThinking]=useState(false),[connection,setConnection]=useState(null),[preview,setPreview]=useState(false),[error,setError]=useState('');
- const [chatSession,setChatSession]=useState(null),[chatNow,setChatNow]=useState(()=>Date.now());
+ const [chatSession,setChatSession]=useState(()=>readChatWorkoutDraft(localStorage,chatWorkoutDraftKey(userId))),[chatNow,setChatNow]=useState(()=>Date.now());
+ useEffect(()=>{const key=chatWorkoutDraftKey(userId);if(!key)return;if(chatSession){try{localStorage.setItem(key,JSON.stringify({session:chatSession,updatedAt:Date.now()}))}catch{}}else clearWorkoutDraft(localStorage,key)},[chatSession,userId]);
  const historyContainer=useRef(null),followBottom=useRef(true),timer=useRef(null),controller=useRef(null);
  const current=steps[step]?.key==='goal'&&profile?.age<18?{...steps[step],chips:['Ganhar massa muscular','Melhorar condicionamento','Criar uma rotina']}:steps[step];
- const history=messages.length?messages:[{role:'ai',text:`${p.name}, o que você quer melhorar hoje?`,intro:true}];
+ const history=messages.length?messages:[{role:'ai',text:`${p.name.split(' ')[0]}, sua ficha de hoje está pronta: ${plan[nextWorkoutId]?.name||'seu próximo treino'}. Você pode começar pelo botão abaixo ou me contar como está se sentindo.`,intro:true}];
  const liveExercise=chatSession?.workout?.exercises?.[chatSession.exerciseIndex];
  const rest=Math.max(0,Math.ceil(((chatSession?.restEndsAt||0)-chatNow)/1000));
 
@@ -44,13 +46,15 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
   return plan[Math.min(Math.max(0,nextWorkoutId),plan.length-1)];
  }
 
- function finishChatSet(session,weight,reps){
+ async function finishChatSet(session,weight,reps){
+  if(!Number.isFinite(Number(weight))||Number(weight)<0||Number(weight)>500||!Number.isInteger(Number(reps))||Number(reps)<1||Number(reps)>100)return {reply:'Confira os valores: carga entre 0 e 500 kg e registro entre 1 e 100. A série ainda não foi salva.'};
   const exercise=session.workout.exercises[session.exerciseIndex],setIndex=session.setIndex;
-  const setLog={exerciseId:exercise.id||'exercise-'+session.exerciseIndex,exerciseName:exercise.name,group:exercise.group||'',setIndex:setIndex+1,weight:Number(weight||0),reps:Number(reps||firstTarget(exercise.reps)),rir:Number(exercise.targetRir??2),targetRir:Number(exercise.targetRir??2),completed:true};
+  const setLog={exerciseId:exercise.id||'exercise-'+session.exerciseIndex,exerciseName:exercise.name,group:exercise.group||'',setIndex:setIndex+1,weight:Number(weight||0),reps:Number(reps||firstTarget(exercise.reps)),rir:null,targetRir:Number(exercise.targetRir??2),completed:true};
   const setLogs=[...session.setLogs,setLog],isLastSet=setIndex>=exercise.sets-1,isLastExercise=session.exerciseIndex>=session.workout.exercises.length-1;
   if(isLastSet&&isLastExercise){
    const minutes=Math.max(1,Math.round((Date.now()-session.startedAt)/60000));
-   onWorkoutComplete?.({name:session.workout.name,minutes,sets:setLogs.length,weights:{},setLogs,feedback:{mode:'chat'}});
+   setBusy(true);const saved=await onWorkoutComplete?.({workoutId:session.workout.id,workoutName:session.workout.name,name:session.workout.name,minutes,sets:setLogs.length,weights:{},setLogs,feedback:{mode:'chat'}});setBusy(false);
+   if(saved===false)return {reply:'A última série ainda não foi salva. Seu treino continua aqui. Tente registrar essa série novamente quando a conexão voltar.'};
    setChatSession(null);
    return {reply:`Treino concluído e salvo. Foram ${setLogs.length} séries registradas em cerca de ${minutes} min. Se quiser, abra Minha evolução para ver o histórico.`,done:true};
   }
@@ -60,7 +64,7 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
   return {reply:isLastSet?`Salvei ${saved}. ${exercise.name} concluído. Descanso de ${format(restSeconds)} e depois vamos para ${nextExercise.name}, série 1 de ${nextExercise.sets}.`:`Salvei ${saved}. Descanso de ${format(restSeconds)}. Depois vem a série ${nextSetIndex+1} de ${exercise.sets} de ${exercise.name}.`};
  }
 
- function handleWorkoutMessage(text){
+ async function handleWorkoutMessage(text){
   if(onboard)return false;
   const t=clean(text),startIntent=/\b(comecei|comecar|começar|iniciar|bora|vamos)\b/.test(t)&&(/\btreino\b/.test(t)||t==='comecei'||t==='bora');
   if(!chatSession&&startIntent){
@@ -76,7 +80,8 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
   if(/\b(cancelar|sair do treino|encerrar treino)\b/.test(t)){
    if(chatSession.setLogs.length){
     const minutes=Math.max(1,Math.round((Date.now()-chatSession.startedAt)/60000));
-    onWorkoutComplete?.({name:chatSession.workout.name+' · parcial',minutes,sets:chatSession.setLogs.length,weights:{},setLogs:chatSession.setLogs,feedback:{mode:'chat'}});
+    setBusy(true);const saved=await onWorkoutComplete?.({workoutId:chatSession.workout.id,workoutName:chatSession.workout.name,name:chatSession.workout.name+' · parcial',minutes,sets:chatSession.setLogs.length,weights:{},setLogs:chatSession.setLogs,feedback:{mode:'chat',partial:true}});setBusy(false);
+    if(saved===false){appendLocal(text,'Não foi possível salvar o treino parcial. Seus registros continuam aqui. Tente encerrar novamente quando a conexão voltar.');return true}
     appendLocal(text,`Treino parcial salvo com ${chatSession.setLogs.length} séries.`);
    }else appendLocal(text,'Treino encerrado sem registros.');
    setChatSession(null);return true;
@@ -88,13 +93,13 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
   if(chatSession.awaiting==='weight'){
    const weight=Number.isFinite(weightFrom(text))?weightFrom(text):numberFrom(text),reps=repsFrom(text);
    if(!Number.isFinite(weight)||weight<0||weight>500){appendLocal(text,'Me diga a carga em kg. Exemplo: “20 kg”.');return true}
-   if(Number.isFinite(reps)&&reps>0&&reps<=100){const result=finishChatSet(chatSession,weight,reps);appendLocal(text,result.reply);return true}
+   if(Number.isFinite(reps)&&reps>0&&reps<=100){const result=await finishChatSet(chatSession,weight,reps);appendLocal(text,result.reply);return true}
    setChatSession({...chatSession,awaiting:'reps',draftWeight:weight});appendLocal(text,`Anotei ${weight} kg. Quantas repetições você fez nessa série?`);return true;
   }
   if(chatSession.awaiting==='reps'){
    const reps=Number.isFinite(repsFrom(text))?repsFrom(text):numberFrom(text);
    if(!Number.isFinite(reps)||reps<1||reps>100){appendLocal(text,'Me diga quantas repetições você fez. Exemplo: “10 reps”.');return true}
-   const result=finishChatSet(chatSession,chatSession.draftWeight||0,reps);appendLocal(text,result.reply);return true;
+   const result=await finishChatSet(chatSession,chatSession.draftWeight||0,reps);appendLocal(text,result.reply);return true;
   }
 
   const setDone=/\b(terminei|acabei|conclui|concluí|fiz)\b/.test(t)&&(/\b(serie|série)\b/.test(t)||t==='terminei'||t==='acabei');
@@ -102,7 +107,7 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
    const weight=weightFrom(text),reps=repsFrom(text),weighted=exercise.equipment!=='Peso corporal';
    if(weighted&&!Number.isFinite(weight)){setChatSession({...chatSession,awaiting:'weight'});appendLocal(text,`Boa. Qual foi a carga na série ${chatSession.setIndex+1} de ${exercise.name}? Pode mandar só “20 kg”.`);return true}
    if(!Number.isFinite(reps)){setChatSession({...chatSession,awaiting:'reps',draftWeight:weighted?weight:0});appendLocal(text,`Certo. Quantas repetições você fez nessa série?`);return true}
-   const result=finishChatSet(chatSession,weighted?weight:0,reps);appendLocal(text,result.reply);return true;
+   const result=await finishChatSet(chatSession,weighted?weight:0,reps);appendLocal(text,result.reply);return true;
   }
   return false;
  }
@@ -111,8 +116,8 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
   if(busy)return;
   setError('');
   if(text.length>5000){setError('Use até 5.000 caracteres por mensagem.');return}
-  if(handleWorkoutMessage(text))return;
-  if(!onboard&&!preview&&!connection?.configured){setError('O TYVON AI está indisponível no momento. Você pode experimentar a prévia.');return}
+  if(await handleWorkoutMessage(text))return;
+  if(!onboard&&!preview&&!connection?.configured){setError('A conversa com IA está indisponível. Sua ficha continua pronta: toque em Começar treino ou experimente a prévia.');return}
   followBottom.current=true;
   const nextMessages=[...(base.length?base:history),{role:'user',text}];
   setMessages(nextMessages);setBusy(true);setThinking(true);
@@ -129,7 +134,7 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
        setStep(step+1);setMessages(prev=>[...prev,{role:'ai',text:onboardingQuestion(step+1,next)}]);
       }else{
        completed(next);
-       setMessages(prev=>[...prev,{role:'ai',text:`Tudo pronto, ${next.name}! Montei ${next.days} sessões por semana para ${next.goal.toLowerCase()}, com cerca de ${next.sessionMinutes||60} minutos por treino.
+       setMessages(prev=>[...prev,{role:'ai',text:`Tudo pronto, ${next.name}! Montei ${makePlan(next).length} sessões por semana para ${next.goal.toLowerCase()}, com cerca de ${next.sessionMinutes||60} minutos por treino.
 
 Cada dia tem uma ficha completa, com exercícios, séries, repetições e descanso definidos.
 
@@ -184,6 +189,7 @@ ${next.age<18?'Vamos priorizar técnica, recuperação e acompanhamento profissi
    <AnimatePresence>{thinking&&<motion.div className="reference-thinking" role="status" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><span className="thinking-dots"><i/><i/><i/></span><ShinyText text="Pensando…" speed={2} color="#777777" shineColor="#eeeeee"/></motion.div>}</AnimatePresence>
   </div>
   <div className="reference-compose">
+   {!onboard&&!chatSession&&<div className="chat-quick-workout"><div><span>SUA FICHA DE HOJE</span><strong>{plan[nextWorkoutId]?.name}</strong><small>{plan[nextWorkoutId]?.minutes} min · {plan[nextWorkoutId]?.exercises.length} exercícios</small></div><button disabled={busy} onClick={()=>start(plan[nextWorkoutId])}>Começar treino<ArrowUpRight size={16}/></button></div>}
    {chatSession&&liveExercise&&<div className="chat-workout-strip"><div><span>AGORA</span><strong>{liveExercise.name}</strong><small>Série {chatSession.setIndex+1}/{liveExercise.sets} · {liveExercise.reps}</small></div>{rest>0?<div className="chat-rest-clock"><Clock size={15}/><span>Descanso</span><strong>{format(rest)}</strong></div>:<span className="chat-ready">Pronto para registrar</span>}</div>}
    {!onboard&&!chatSession&&connection&&!connection.configured&&<div className="connection-note"><span>{preview?'Você está explorando respostas de exemplo.':'O TYVON AI está indisponível no momento.'}</span><button onClick={()=>setPreview(!preview)} disabled={busy}>{preview?'Sair da prévia':'Experimentar prévia'}<ArrowUpRight size={12}/></button></div>}
    <div className="suggestions">{suggestions?.map(c=><button key={c} disabled={busy} onClick={()=>send(c)}>{c}</button>)}</div>

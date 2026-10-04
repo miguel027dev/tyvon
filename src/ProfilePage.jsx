@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {Check,Download,LockKeyhole,Share2,ShieldCheck,Sparkles,TrendingUp,UserRound} from 'lucide-react';
 import AccountActions from './AccountActions';
 import {apiFetch} from './api.js';
-import {steps} from './logic.js';
+import {makePlan} from './logic.js';
 
 const MUSCLE_FREE_GOALS=['Ganhar massa muscular','Melhorar condicionamento','Perder gordura','Criar uma rotina'];
 const EQUIPMENT=['Halteres','Barras','Máquinas','Cabos','Banco','Peso corporal'];
@@ -43,10 +43,11 @@ export default function ProfilePage({p,user,logs,setProfile,notify,reset,signOut
  useEffect(()=>{apiFetch('/api/privacy/requests/me').then(r=>r.ok?r.json():{items:[]}).then(d=>setPrivacy(d.items||[])).catch(()=>{})},[]);
  const weekStart=useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d},[]);
  const weekly=logs.filter(l=>new Date(l.date)>=weekStart),minutes=Math.round(logs.reduce((a,l)=>a+Number(l.minutes||0),0));
+ const sessions=makePlan(p).length;
  const cards=[
   {id:'week',title:'Minha semana',value:String(weekly.length),subtitle:weekly.length===1?'1 treino registrado nesta semana.':'treinos registrados nesta semana.'},
   {id:'journey',title:'Minha constância',value:String(logs.length),subtitle:minutes+' minutos de treino registrados na minha jornada.'},
-  {id:'plan',title:'Meu plano',value:String(p.days)+'×',subtitle:p.days+' dias por semana · '+p.goal+'.'}
+  {id:'plan',title:'Meu plano',value:String(sessions)+'×',subtitle:sessions+' sessões no plano · '+p.goal+'.'}
  ];
 
  async function share(card){
@@ -85,7 +86,7 @@ export default function ProfilePage({p,user,logs,setProfile,notify,reset,signOut
     <div className="profile-save-row"><span><ShieldCheck size={15}/>TYVON · preto, grafite e branco</span><button className="v1-primary"><Check size={16}/>Salvar alterações</button></div>
    </form>
 
-   <aside className="profile-side-stack"><section className="profile-account-summary"><span className="profile-avatar">{p.name.slice(0,2).toUpperCase()}</span><h2>{p.name}</h2><p>{user?.email||p.email}</p><div><span><strong>{p.days}</strong>dias/semana</span><span><strong>{logs.length}</strong>treinos</span></div></section>
+   <aside className="profile-side-stack"><section className="profile-account-summary"><span className="profile-avatar">{p.name.slice(0,2).toUpperCase()}</span><h2>{p.name}</h2><p>{user?.email||p.email}</p><div><span><strong>{sessions}</strong>sessões no plano</span><span><strong>{logs.length}</strong>treinos</span></div></section>
     <section className="profile-privacy-card"><TrendingUp size={21}/><span>PRIVACIDADE</span><h3>Seus dados, seus pedidos.</h3><p>{privacy.length?privacy.length+' solicitação(ões) LGPD vinculada(s) à sua conta.':'Nenhuma solicitação LGPD pendente na sua conta.'}</p><a href="/privacidade">Abrir central de privacidade</a></section>
     <AccountActions signOut={signOut} onDelete={()=>{if(window.confirm('Apagar perfil, conversas e treinos da sua conta?'))remove()}}/>
     {deleting&&<p className="profile-delete-state">Apagando seus dados…</p>}

@@ -25,3 +25,21 @@ test('equipment parsing is bounded to known options',()=>{
  assert.deepEqual(parseAnswer(step('equipment'),'só peso corporal').value,['Peso corporal']);
  assert.ok(parseAnswer(step('equipment'),'qualquer coisa').error);
 });
+
+import {readWorkoutDraft,saveWorkoutDraft,workoutDraftKey,readChatWorkoutDraft,chatWorkoutDraftKey} from '../src/workout-draft.js';
+test('workout recovery is scoped, expires and survives storage failures',()=>{
+ const values=new Map(),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ const key=workoutDraftKey('athlete-1'),workout={id:0,exercises:[{sets:2}]};
+ saveWorkoutDraft(storage,key,{workout,index:0,seconds:120,checked:{'0-0':true}});
+ assert.equal(readWorkoutDraft(storage,key).seconds,120);
+ assert.equal(readWorkoutDraft(storage,workoutDraftKey('athlete-2')),null);
+ assert.equal(readWorkoutDraft(storage,key,Date.now()+86400001),null);
+ storage.setItem(key,JSON.stringify({version:1,updatedAt:Date.now(),workout,index:9,seconds:0,checked:{}}));
+ assert.equal(readWorkoutDraft(storage,key),null);
+ assert.equal(saveWorkoutDraft({setItem(){throw Error('quota')}},key,{}),false);
+ assert.equal(readWorkoutDraft({getItem(){throw Error('blocked')}},key),null);
+ const session={workout,exerciseIndex:0,setIndex:1,setLogs:[],startedAt:Date.now()};
+ const chatKey=chatWorkoutDraftKey('athlete-1');storage.setItem(chatKey,JSON.stringify({session,updatedAt:Date.now()}));
+ assert.equal(readChatWorkoutDraft(storage,chatKey).setIndex,1);
+ assert.equal(readChatWorkoutDraft(storage,chatKey,Date.now()+86400001),null);
+});

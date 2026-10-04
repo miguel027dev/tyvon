@@ -24,7 +24,7 @@ export async function accountRequest(method='GET',state){
  catch(e){if(e.name==='AbortError')throw new Error('A conexão demorou mais que o esperado. Tente novamente.');throw e}
  finally{clearTimeout(timeout)}
  const data=await response.json().catch(()=>({}));
- if(Number.isInteger(data.revision))accountRevision=data.revision;
  if(!response.ok){const e=new Error(data.error||'Não foi possível acessar seu perfil.');e.code=data.code;e.status=response.status;e.revision=data.revision;throw e}
+ if(Number.isInteger(data.revision))accountRevision=data.revision;
  return data;
 }

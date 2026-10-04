@@ -49,3 +49,24 @@ def test_argon2_password_round_trip():
     assert replacement is None
     bad, _ = verify_password(stored, "senha-errada-123")
     assert bad is False
+
+
+@pytest.mark.parametrize("rir,target_rir", [(None, None), (None, 2), (0, 0), (3, 2)])
+def test_unknown_effort_is_not_invented(rir, target_rir):
+    state = validate_account_state({
+        "profile": {"complete": False}, "messages": [], "step": 0,
+        "logs": [{"id": "session", "setLogs": [{"reps": 10, "weight": 20, "rir": rir, "targetRir": target_rir}]}],
+    }, "test@example.com")
+    recorded = state["logs"][0]["setLogs"][0]
+    assert recorded["rir"] == rir
+    assert recorded["targetRir"] == target_rir
+
+
+def test_partial_session_flag_survives_account_normalization():
+    state = validate_account_state({
+        'profile': {'name': 'Teste', 'complete': False, 'equipment': []},
+        'logs': [{'id': 'partial-session', 'name': 'Superiores A · parcial', 'minutes': 5, 'sets': 1,
+                  'feedback': {'mode': 'detailed', 'partial': True}, 'setLogs': []}],
+        'messages': [], 'step': 0,
+    }, 'test@example.com')
+    assert state['logs'][0]['feedback']['partial'] is True

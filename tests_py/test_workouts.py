@@ -16,6 +16,24 @@ def test_session_duration_caps_exercises():
     assert all(len(w["exercises"])<=5 for w in plan)
 
 
+def test_short_sessions_prioritize_groups_and_preserve_order():
+    for equipment in (["Peso corporal"], ["Halteres"], PROFILE["equipment"]):
+        for days in (2, 3, 4, 5):
+            full = make_plan({**PROFILE, "equipment": equipment, "days": days, "sessionMinutes": 90})
+            short = make_plan({**PROFILE, "equipment": equipment, "days": days, "sessionMinutes": 35})
+            for original, workout in zip(full, short):
+                groups = list(dict.fromkeys(e["group"] for e in workout["exercises"]))
+                available_groups = {e["group"] for e in original["exercises"]}
+                assert len(groups) == min(5, len(available_groups))
+                assert len(workout["exercises"]) == min(5, len(original["exercises"]))
+                ids = [e["id"] for e in workout["exercises"]]
+                assert [e["id"] for e in original["exercises"] if e["id"] in ids] == ids
+                assert workout["focus"] == " · ".join(groups)
+    push = make_plan({**PROFILE, "days": 3, "equipment": ["Halteres"], "sessionMinutes": 35})[0]
+    assert any(e["group"] == "Tríceps" for e in push["exercises"])
+    assert any(e["group"] == "Core" for e in push["exercises"])
+
+
 def test_minor_plan_is_conservative():
     plan=make_plan({**PROFILE,"age":14,"days":5})
     assert len(plan)<=3

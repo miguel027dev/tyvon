@@ -53,7 +53,7 @@ Mensagens em streaming não são gravadas token por token. O autosave ignora men
 
 ## Migrações
 
-`backend/migrate.py` executa arquivos SQL versionados de `migrations/` antes do Gunicorn servir tráfego.
+`gunicorn.conf.py` chama `backend/migrate.py` uma vez no processo master, antes de criar os workers. O desenvolvimento com `python app.py` também executa as migrações antes de servir tráfego.
 
 O runner usa PostgreSQL advisory lock, então múltiplos workers/processos podem iniciar sem executar DDL concorrente.
 
@@ -206,3 +206,7 @@ Nunca use prefixo `VITE_` para segredos.
 pip install -r requirements.txt && npm ci && npm run build
 gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 90 wsgi:app
 ```
+
+## Auditoria de outubro
+
+Veja [auditoria e pesquisa de produto](docs/AUDIT-2026-10-04.md) para correções, validações e limites da revisão.

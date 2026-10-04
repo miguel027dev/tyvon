@@ -21,6 +21,27 @@ test('session duration caps exercise count without creating tiny adult plans',()
  assert.ok(normal.every(w=>w.exercises.length>=6&&w.exercises.length<=8));
 });
 
+test('short sessions prioritize available muscle groups and preserve exercise order',()=>{
+ for(const equipment of [['Peso corporal'],['Halteres'],profile.equipment]){
+  for(const days of [2,3,4,5]){
+   const full=makePlan({...profile,equipment,days,sessionMinutes:90});
+   const short=makePlan({...profile,equipment,days,sessionMinutes:35});
+   short.forEach((w,i)=>{
+    const groups=[...new Set(w.exercises.map(e=>e.group))];
+    const availableGroups=new Set(full[i].exercises.map(e=>e.group));
+    assert.equal(groups.length,Math.min(5,availableGroups.size));
+    assert.equal(w.exercises.length,Math.min(5,full[i].exercises.length));
+    const ids=w.exercises.map(e=>e.id);
+    assert.deepEqual(full[i].exercises.filter(e=>ids.includes(e.id)).map(e=>e.id),ids);
+    assert.equal(w.focus,groups.join(' · '));
+   });
+  }
+ }
+ const push=makePlan({...profile,days:3,equipment:['Halteres'],sessionMinutes:35})[0];
+ assert.ok(push.exercises.some(e=>e.group==='Tríceps'));
+ assert.ok(push.exercises.some(e=>e.group==='Core'));
+});
+
 test('equipment selection never invents unavailable weighted equipment',()=>{
  const body=makePlan({...profile,days:3,equipment:['Peso corporal']});
  assert.ok(body.every(w=>w.exercises.every(e=>e.equipment==='Peso corporal')));

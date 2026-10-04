@@ -4,6 +4,7 @@ import secrets
 import psycopg
 from flask import Flask, g, jsonify, redirect, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import HTTPException
 
 from backend.account import account_bp
 from backend.auth import auth_bp
@@ -80,6 +81,8 @@ def too_large(_exc):
 
 @app.errorhandler(Exception)
 def unexpected_error(exc):
+    if isinstance(exc, HTTPException):
+        return jsonify({"error": exc.name, "code": "HTTP_ERROR"}), exc.code
     log_event("error", "unhandled_exception", error=type(exc).__name__)
     return jsonify({"error": "Ocorreu um erro inesperado.", "code": "INTERNAL_ERROR"}), 500
 

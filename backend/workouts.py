@@ -36,7 +36,7 @@ LIB = {
     "chest_supported_row": movement("chest_supported_row", "Remada apoiada com halteres", "Costas", "Halteres", "Apoie o peito no banco e puxe sem tirar o tronco do apoio.", True, ["Halteres", "Banco"]),
     "inverted_row": movement("inverted_row", "Remada invertida", "Costas", "Peso corporal", "Mantenha corpo alinhado e puxe o peito em direção ao apoio.", True),
     "back_bw": movement("back_bw", "Elevação de braços em W", "Costas", "Peso corporal", "Mova os braços com controle sem forçar a lombar."),
-    "barbell_squat": movement("barbell_squat", "Agachamento com barra", "Quadríceps", "Barras", "Mantenha os pés firmes e a coluna estável durante a descida.", True),
+    "barbell_squat": movement("barbell_squat", "Agachamento com barra", "Quadríceps", "Barras", "Mantenha os pés firmes e a coluna estável durante a descida.", True, ["Barras"]),
     "legpress": movement("legpress", "Leg press", "Quadríceps", "Máquinas", "Mantenha a lombar apoiada e use amplitude confortável.", True),
     "hack_squat": movement("hack_squat", "Hack squat", "Quadríceps", "Máquinas", "Mantenha as costas apoiadas e controle a descida.", True),
     "goblet": movement("goblet", "Agachamento goblet", "Quadríceps", "Halteres", "Mantenha os pés firmes e o tronco estável.", True),
@@ -220,6 +220,19 @@ def _templates(profile):
     ]
 
 
+def _select_coverage(moves, limit):
+    selected, groups = set(), set()
+    for exercise in moves:
+        if exercise["group"] not in groups and len(selected) < limit:
+            selected.add(exercise["id"])
+            groups.add(exercise["group"])
+    for exercise in moves:
+        if len(selected) >= limit:
+            break
+        selected.add(exercise["id"])
+    return [exercise for exercise in moves if exercise["id"] in selected]
+
+
 def make_plan(profile=None):
     profile = profile or {}
     minor = isinstance(profile.get("age"), int) and profile["age"] < 18
@@ -227,7 +240,9 @@ def make_plan(profile=None):
     limit = _exercise_limit(profile, minor)
     plan = []
     for idx, (name, focus, moves) in enumerate(_templates(profile)):
-        exercises = [_prescribe(exercise, profile) for exercise in _unique(moves) if _has(profile, exercise) or exercise["equipment"] == "Peso corporal"][:limit]
+        available = [exercise for exercise in _unique(moves) if _has(profile, exercise) or exercise["equipment"] == "Peso corporal"]
+        exercises = [_prescribe(exercise, profile) for exercise in _select_coverage(available, limit)]
+        focus = " · ".join(dict.fromkeys(exercise["group"] for exercise in exercises))
         minutes = min(int(profile.get("sessionMinutes") or 60), max(35, len(exercises) * 7))
         plan.append({
             "id": idx,

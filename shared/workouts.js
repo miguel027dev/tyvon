@@ -153,10 +153,21 @@ function templates(p){
  ];
 }
 
+function selectCoverage(moves,limit){
+ const selected=new Set(),groups=new Set();
+ for(const e of moves){
+  if(!groups.has(e.group)&&selected.size<limit){selected.add(e.id);groups.add(e.group)}
+ }
+ for(const e of moves){if(selected.size>=limit)break;selected.add(e.id)}
+ return moves.filter(e=>selected.has(e.id));
+}
+
 export function makePlan(p={}){
  const minor=Number.isInteger(p.age)&&p.age<18,restricted=!!p.limitations&&p.limitations!=='Nenhuma',limit=exerciseLimit(p,minor);
  return templates(p).map(([name,focus,moves],id)=>{
-  const exercises=unique(moves).filter(e=>has(p,e)||e.equipment==='Peso corporal').slice(0,limit).map(e=>prescribe(e,p));
+  const available=unique(moves).filter(e=>has(p,e)||e.equipment==='Peso corporal');
+  const exercises=selectCoverage(available,limit).map(e=>prescribe(e,p));
+  focus=[...new Set(exercises.map(e=>e.group))].join(' · ');
   const minutes=Math.min(Number(p.sessionMinutes)||60,Math.max(35,exercises.length*7));
   return {id,name,focus,kind:'strength',method:minor?'TYVON · técnica supervisionada':TRAINING_METHOD,minutes,intensity:minor?'3–4 repetições de reserva':p.experience==='Iniciante'?'2–3 repetições de reserva':'1–3 repetições de reserva',recovery:'Distribua as sessões na semana e deixe os grupos musculares se recuperarem antes de repetir trabalho pesado.',note:minor?'Dos 14 aos 17, priorize técnica, supervisão e cargas confortáveis; não use progressão automática de carga.':restricted?'Você informou uma restrição. Valide exercícios e cargas com um profissional.':'Registre carga, repetições e RIR. O TYVON usa seu próprio histórico para sugerir o próximo passo.',progression:minor?'Ajuste cargas com orientação profissional.':'Quando você domina o topo da faixa com técnica estável e margem, o TYVON pode sugerir um pequeno aumento na próxima sessão.',exercises};
  });
