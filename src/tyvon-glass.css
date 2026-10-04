@@ -617,3 +617,187 @@ footer{opacity:.6}
     background:#151518!important;
   }
 }
+
+
+/* ----- Workout reveal / active session / splash ----- */
+.tyvon-splash{
+  background:
+    radial-gradient(500px 340px at 50% 35%,rgba(255,255,255,.075),transparent 66%),
+    #070708!important;
+}
+.splash-film{
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.045)!important;
+  -webkit-backdrop-filter:blur(20px);
+  backdrop-filter:blur(20px);
+  box-shadow:0 24px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05)!important;
+}
+.splash-loader{box-shadow:0 0 16px rgba(255,255,255,.34)}
+
+.workout-reveal,.workout-session{
+  background:
+    radial-gradient(760px 500px at 50% -90px,rgba(255,255,255,.075),transparent 66%),
+    radial-gradient(500px 420px at -120px 78%,rgba(255,255,255,.035),transparent 65%),
+    #070708!important;
+}
+.reveal-ambient{
+  opacity:.8;
+  background:
+    radial-gradient(circle at 74% 14%,rgba(255,255,255,.09),transparent 23%),
+    radial-gradient(circle at 10% 84%,rgba(255,255,255,.045),transparent 20%)!important;
+  filter:blur(18px)!important;
+}
+.reveal-header{
+  position:sticky!important;
+  top:max(8px,env(safe-area-inset-top))!important;
+  width:min(calc(100% - 20px),760px);
+  height:60px!important;
+  margin:8px auto 0!important;
+  padding:0 10px 0 16px!important;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:20px;
+  background:rgba(17,17,20,.62);
+  -webkit-backdrop-filter:blur(26px) saturate(140%);
+  backdrop-filter:blur(26px) saturate(140%);
+  box-shadow:0 12px 34px #0006;
+}
+.reveal-header button,.session-appbar>button{
+  border-color:rgba(255,255,255,.09)!important;
+  background:rgba(255,255,255,.045)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.reveal-orbit span{
+  background:linear-gradient(145deg,#fff,#c7c7cb)!important;
+  border:1px solid rgba(255,255,255,.82);
+  box-shadow:0 30px 80px #000b,inset 0 1px 0 #fff,0 0 0 9px rgba(255,255,255,.025)!important;
+}
+.reveal-orbit:before,.reveal-orbit:after{border-color:rgba(255,255,255,.10)!important}
+.reveal-tabs button{
+  border-color:rgba(255,255,255,.09)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:17px!important;
+}
+.reveal-tabs button>span{background:rgba(255,255,255,.06)!important}
+.reveal-tabs button[aria-selected=true]{
+  background:#ededf0!important;
+  border-color:#fff!important;
+  color:#111!important;
+  box-shadow:0 8px 22px #0005;
+}
+.reveal-tabs button[aria-selected=true]>span{background:#111!important;color:#fff!important}
+.reveal-workout-card{
+  border-color:rgba(255,255,255,.11)!important;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.055),transparent 44%),
+    rgba(18,18,21,.72)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(130%);
+  backdrop-filter:blur(24px) saturate(130%);
+  box-shadow:var(--tyvon-shadow)!important;
+}
+.reveal-card-metrics span{
+  background:rgba(255,255,255,.045)!important;
+  border:1px solid rgba(255,255,255,.06);
+}
+.reveal-exercises,.reveal-exercises>div{border-color:rgba(255,255,255,.07)!important}
+.reveal-enter,.reveal-start,.session-main-action,.session-next{
+  background:linear-gradient(180deg,#fff,#e8e8eb)!important;
+  color:#111114!important;
+  border:1px solid rgba(255,255,255,.88)!important;
+  box-shadow:inset 0 1px 0 #fff,0 16px 36px rgba(0,0,0,.38)!important;
+}
+
+.session-appbar{
+  top:max(7px,env(safe-area-inset-top))!important;
+  width:min(calc(100% - 16px),760px);
+  margin:7px auto 0!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:18px;
+  background:rgba(16,16,19,.68)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(135%);
+  backdrop-filter:blur(26px) saturate(135%);
+  box-shadow:0 10px 32px #0006;
+}
+.session-progress-head{margin-top:12px!important}
+.session-progress-line{background:rgba(255,255,255,.07)!important;border-radius:999px;overflow:hidden}
+.session-progress-line i{background:linear-gradient(90deg,#8e8e95,#fff)!important}
+.session-muscle span,.warmup-pill{
+  background:rgba(255,255,255,.045)!important;
+  border:1px solid rgba(255,255,255,.07);
+}
+.session-prescription span{
+  background:rgba(255,255,255,.027);
+  border-color:rgba(255,255,255,.08)!important;
+  border-radius:16px!important;
+}
+.session-exercise-guide{
+  border-color:rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.028)!important;
+  border-radius:16px!important;
+}
+.session-set{
+  border-color:rgba(255,255,255,.09)!important;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.035),transparent 52%),
+    rgba(18,18,21,.76)!important;
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 8px 22px rgba(0,0,0,.22);
+}
+.session-set:hover:not(.is-complete){border-color:rgba(255,255,255,.16)!important}
+.session-set.is-complete{
+  background:linear-gradient(180deg,#f4f4f5,#e6e6e9)!important;
+  border-color:#fff!important;
+  box-shadow:0 10px 26px #0005;
+}
+.session-set>button{
+  background:rgba(255,255,255,.045)!important;
+  border-color:rgba(255,255,255,.10)!important;
+}
+.session-set.is-complete>button{background:#111!important;border-color:#111!important}
+.session-progression{
+  border-color:rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.035)!important;
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+.session-rest{
+  border-color:rgba(255,255,255,.13)!important;
+  background:rgba(25,25,28,.78)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(140%);
+  backdrop-filter:blur(28px) saturate(140%);
+  box-shadow:0 20px 60px #000a,inset 0 1px 0 rgba(255,255,255,.04)!important;
+}
+.rest-ring:before{background:#19191c!important}
+.session-footer{
+  background:linear-gradient(180deg,transparent,rgba(7,7,8,.92) 23%)!important;
+  -webkit-backdrop-filter:blur(3px);
+  backdrop-filter:blur(3px);
+}
+.session-prev{
+  border-color:rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.045)!important;
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+.session-confirm>div,.session-finish{
+  position:relative;
+}
+.finish-icon{
+  background:linear-gradient(145deg,#fff,#cacacd)!important;
+  box-shadow:0 22px 70px rgba(255,255,255,.08),inset 0 1px 0 #fff!important;
+}
+.finish-stats span,.session-feedback button,.session-download-action{
+  background:rgba(255,255,255,.035)!important;
+  border-color:rgba(255,255,255,.09)!important;
+}
+.session-feedback button.active{background:#ededf0!important;color:#111!important;border-color:#fff!important}
+
+@media(max-width:700px){
+  .reveal-header{top:max(6px,env(safe-area-inset-top))!important;width:calc(100% - 16px);border-radius:18px}
+  .session-appbar{top:max(5px,env(safe-area-inset-top))!important;width:calc(100% - 12px);border-radius:17px}
+  .reveal-plan{padding-inline:14px!important}
+  .reveal-workout-card{border-radius:25px!important}
+  .session-body{padding-inline:14px!important}
+  .session-set{border-radius:18px!important}
+  .session-footer{padding-inline:12px!important}
+}
