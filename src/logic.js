@@ -14,6 +14,7 @@ export const steps=[
 export function parseAnswer(step,text){
  const t=text.trim();if(!t)return {error:'Me envie uma resposta para continuarmos.'};
  const normalized=t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ');
+ if(['height','weight'].includes(step.key)&&/^(pular|pular dados corporais|prefiro nao informar|nao informar|depois)$/.test(normalized))return {value:null};
  if(step.key==='name'){const name=t.replace(/^(?:(?:meu nome (?:é|e)|me chamo|pode me chamar de)\s+)/i,'').trim();if(!name)return {error:'Como você quer que eu te chame?'};if(name.length>40)return {error:'Pode usar um nome com até 40 caracteres?'};return {value:name};}
  if(step.key==='age'){const match=normalized.match(/^(?:(?:eu )?tenho |(?:a )?minha idade (?:e|eh) |idade\s*[:=]?\s*)?(\d{1,3})(?:\s*anos?(?: de idade)?)?[.!]?$/),n=match?Number(match[1]):NaN;if(!Number.isInteger(n)||n<14||n>100)return {error:'Me diga uma idade entre 14 e 100 anos, como “18” ou “18 anos”.'};return {value:n};}
  if(step.key==='height'){const match=normalized.match(/^(?:(?:eu )?(?:tenho|meço|meco) )?(\d+(?:[.,]\d+)?)(?:\s*(cm|m|metros?))?[.!]?$/);if(!match)return {error:'Me diga sua altura como “175 cm” ou “1,75 m”.'};let n=Number(match[1].replace(',','.'));if(match[2]&&/^m/.test(match[2])&&n<3)n*=100;if(!Number.isFinite(n)||n<120||n>230)return {error:'Me diga uma altura entre 120 e 230 cm.'};return {value:Math.round(n*10)/10};}

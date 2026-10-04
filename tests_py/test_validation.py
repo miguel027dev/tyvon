@@ -70,3 +70,33 @@ def test_partial_session_flag_survives_account_normalization():
         'messages': [], 'step': 0,
     }, 'test@example.com')
     assert state['logs'][0]['feedback']['partial'] is True
+
+
+def test_complete_profile_can_skip_body_measurements():
+    state = validate_account_state({
+        "profile": {"name": "Teste", "complete": True, "age": 26,
+                    "height": None, "weight": None, "goal": "Criar uma rotina",
+                    "experience": "Iniciante", "equipment": ["Peso corporal"],
+                    "days": 3, "sessionMinutes": 45},
+        "messages": [], "logs": [], "step": 9,
+    }, "test@example.com")
+    assert state["profile"]["complete"] is True
+    assert state["profile"]["height"] is None
+    assert state["profile"]["weight"] is None
+
+
+@pytest.mark.parametrize("height,weight", [(0, None), (None, 0), (None, 999)])
+def test_optional_body_measurements_still_validate_supplied_values(height, weight):
+    from backend.validation import normalize_profile
+    with pytest.raises(ValueError):
+        normalize_profile({"height": height, "weight": weight})
+
+
+def test_timed_sets_preserve_units_and_duration():
+    state = validate_account_state({
+        "profile": {"complete": False}, "messages": [], "step": 0,
+        "logs": [{"id": "timed", "setLogs": [{"exerciseName": "Prancha", "reps": 150, "unit": "seconds", "completed": True}]}],
+    }, "test@example.com")
+    recorded = state["logs"][0]["setLogs"][0]
+    assert recorded["unit"] == "seconds"
+    assert recorded["reps"] == 150

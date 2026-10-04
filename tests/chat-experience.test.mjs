@@ -43,3 +43,9 @@ test('workout recovery is scoped, expires and survives storage failures',()=>{
  assert.equal(readChatWorkoutDraft(storage,chatKey).setIndex,1);
  assert.equal(readChatWorkoutDraft(storage,chatKey,Date.now()+86400001),null);
 });
+
+
+test('optional body metrics can be skipped without invented values',()=>{
+ for(const key of ['height','weight'])for(const answer of ['Pular','Prefiro não informar','Depois'])assert.deepEqual(parseAnswer(step(key),answer),{value:null});
+ assert.ok(parseAnswer(step('age'),'Pular').error);
+});

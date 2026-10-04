@@ -4,6 +4,8 @@ import {AnimatePresence,motion} from 'motion/react';
 import {ChartNoAxesCombined,ChevronDown,ChevronRight,Dumbbell,LayoutDashboard,Menu,MessageSquare,User} from 'lucide-react';
 import AppDock from './AppDock';
 import Chat from './Chat';
+import {workoutRecord,upsertWorkoutRecord} from './workout-record.js';
+import OnboardingFlow from './OnboardingFlow';
 import Entry from './Entry';
 import Home from './Home';
 import LegalPage from './LegalPage';
@@ -24,6 +26,7 @@ import './chat-refinement.css';
 import './workout-experience.css';
 import './production.css';
 import './quick-start.css';
+import './app-experience.css';
 import {workoutDraftKey,readWorkoutDraft,clearWorkoutDraft,chatWorkoutDraftKey,readChatWorkoutDraft} from './workout-draft.js';
 
 const nav=[
@@ -109,9 +112,8 @@ function App(){
  function ask(text){setChatRequest({id:crypto.randomUUID(),text});go('chat')}
  function completed(next){
   const completeProfile={...next,complete:true};
-  setProfile(completeProfile);setOnboard(false);notify('Seu plano está pronto.');setTimeout(()=>setPlanReveal(completeProfile),450);
+  setProfile(completeProfile);setOnboard(false);notify('Seu plano está pronto.');setRoute('overview');setMobile(false);window.scrollTo(0,0);
  }
- function workoutLog(log){return {...log,engine:'tyvon',setLogs:log.setLogs||[],feedback:log.feedback||{},date:new Date().toISOString(),id:crypto.randomUUID()}}
  function startWorkout(workout){
   const saved=readWorkoutDraft(localStorage,draftKey);
   if(readChatWorkoutDraft(localStorage,chatWorkoutDraftKey(user?.id))){notify("Seu treino está em andamento no chat.");go("chat");return}
@@ -122,12 +124,12 @@ function App(){
  async function finish(log){
   if(finalizing.current)return false;
   finalizing.current=true;
-  const saved=pendingFinalLog.current||workoutLog(log);pendingFinalLog.current=saved;
-  const nextLogs=logs.some(item=>item.id===saved.id)?logs:[...logs,saved];
+  const saved=workoutRecord(log,pendingFinalLog.current);pendingFinalLog.current=saved;
+  const nextLogs=upsertWorkoutRecord(logs,saved);
   setLogs(nextLogs);
   try{
    await storage.flush({profile,logs:nextLogs,messages,step});
-   setLogs(prev=>prev.some(item=>item.id===saved.id)?prev:[...prev,saved]);
+   setLogs(prev=>upsertWorkoutRecord(prev,saved));
    clearWorkoutDraft(localStorage,draftKey);setSessionDraft(null);pendingFinalLog.current=null;
    setActiveWorkout(null);go('analytics');notify('Treino registrado.');return true;
   }catch(error){notify(error.message||'Não foi possível salvar. Seu treino continua aqui para tentar novamente.');return false}
@@ -136,10 +138,10 @@ function App(){
  async function finishChatWorkout(log){
   if(finalizing.current)return false;
   finalizing.current=true;
-  const saved=pendingFinalLog.current||workoutLog(log);pendingFinalLog.current=saved;
-  const nextLogs=logs.some(item=>item.id===saved.id)?logs:[...logs,saved];
+  const saved=workoutRecord(log,pendingFinalLog.current);pendingFinalLog.current=saved;
+  const nextLogs=upsertWorkoutRecord(logs,saved);
   setLogs(nextLogs);
-  try{await storage.flush({profile,logs:nextLogs,messages,step});setLogs(prev=>prev.some(item=>item.id===saved.id)?prev:[...prev,saved]);pendingFinalLog.current=null;notify('Treino registrado pelo chat.');return true}
+  try{await storage.flush({profile,logs:nextLogs,messages,step});setLogs(prev=>upsertWorkoutRecord(prev,saved));pendingFinalLog.current=null;notify('Treino registrado pelo chat.');return true}
   catch(error){notify(error.message||'Salvamento pendente. Tente registrar a última série novamente.');return false}
   finally{finalizing.current=false}
  }
@@ -172,7 +174,8 @@ function App(){
    {storage.error&&<div className="account-save-alert" role="alert"><span>{storage.error}{storage.error.includes('outra aba')&&<small> Alterações locais pendentes não serão aplicadas ao recarregar.</small>}</span><button onClick={()=>storage.error.includes('outra aba')?location.reload():storage.retry()}>{storage.error.includes('outra aba')?'Recarregar conta':'Tentar salvar novamente'}</button></div>}
    <main><AnimatePresence mode="wait"><motion.div key={route} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.18}}>
     {route==='overview'&&<Home p={p} plan={plan} logs={logs} go={go} start={startWorkout} ask={ask} nextWorkoutId={nextWorkoutId} draft={resumeDraft} onResume={resumeWorkout}/>}
-    {route==='chat'&&<Chat request={chatRequest} clearRequest={()=>setChatRequest(null)} profile={profile} p={p} setProfile={setProfile} messages={messages} setMessages={setMessages} onboard={onboard} step={step} setStep={setStep} completed={completed} plan={plan} go={go} saveStatus={storage.status} start={startWorkout} nextWorkoutId={nextWorkoutId} onWorkoutComplete={finishChatWorkout} userId={user?.id}/>}
+    {route==='chat'&&onboard&&<OnboardingFlow profile={profile} setProfile={setProfile} step={step} setStep={setStep} completed={completed} setMessages={setMessages}/>}
+    {route==='chat'&&!onboard&&<Chat request={chatRequest} clearRequest={()=>setChatRequest(null)} profile={profile} p={p} setProfile={setProfile} messages={messages} setMessages={setMessages} onboard={onboard} step={step} setStep={setStep} completed={completed} plan={plan} go={go} saveStatus={storage.status} start={startWorkout} nextWorkoutId={nextWorkoutId} onWorkoutComplete={finishChatWorkout} userId={user?.id} logs={logs}/>}
     {route==='workouts'&&<WorkoutsPage p={p} plan={plan} start={startWorkout}/>}
     {route==='analytics'&&<AnalyticsPage logs={logs} go={go}/>}
     {route==='profile'&&<ProfilePage p={p} user={user} logs={logs} setProfile={setProfile} notify={notify} reset={reset} signOut={signOut}/>}

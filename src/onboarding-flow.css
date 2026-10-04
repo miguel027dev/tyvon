@@ -1,0 +1,50 @@
+.onboarding-flow{width:100%;max-width:760px;margin:0 auto;height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px 24px calc(28px + env(safe-area-inset-bottom));color:#f1f1f3;scrollbar-width:thin}
+.onboarding-flow-header{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#a0a0a8;margin-bottom:18px;font-size:10px;letter-spacing:.11em}
+.onboarding-flow-header button{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:0;min-height:44px;padding:8px;color:#ccc;background:transparent}
+.onboarding-flow-header button:disabled{opacity:.25}
+.onboarding-flow-progress{height:3px;background:#27272d;border-radius:3px;overflow:hidden;margin-bottom:30px}
+.onboarding-flow-progress>span{height:100%;display:block;background:#eee;transition:width .2s ease}
+.onboarding-flow-card{border:1px solid #303036;border-radius:26px;background:radial-gradient(ellipse at 100% 0%,#ffffff06,transparent 60%),#111113;padding:clamp(22px,5vw,42px)}
+.onboarding-flow-eyebrow{font-size:10px;letter-spacing:.13em;color:#96969f}
+.onboarding-flow-card h1{font-size:clamp(25px,4.8vw,38px);line-height:1.18;letter-spacing:-.045em;font-weight:550;margin:16px 0}
+.onboarding-flow-card>p{font-size:13px;color:#a2a2ab;line-height:1.7;margin-bottom:24px}
+.onboarding-flow-choices{display:grid;gap:10px;margin:24px 0}
+.onboarding-flow-choices button{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#1a1a1e;color:#ddd;border:1px solid #36363d;border-radius:14px;padding:15px 18px;min-height:52px;text-align:left;font-size:14px;line-height:1.5}
+.onboarding-flow-choices button.selected{background:#eee;color:#111;border-color:#eee}
+.onboarding-flow-field{display:block;margin:26px 0 24px;font-size:12px;color:#aaaab2}
+.onboarding-flow-field>span{display:block;margin-bottom:10px}
+.onboarding-flow-field>div{display:flex;align-items:center;gap:12px;border:1px solid #4a4a52;background:#19191d;border-radius:14px;padding:14px 16px}
+.onboarding-flow-field input,.onboarding-flow-field textarea{width:100%;min-width:0;border:0;color:#eee;background:transparent;font:inherit;font-size:18px;line-height:1.5;outline:none}
+.onboarding-flow-field>div:focus-within{border-color:#ccc;box-shadow:0 0 0 1px #ccc}
+.onboarding-flow-field textarea{resize:vertical;min-height:100px;font-size:16px}
+.onboarding-flow-field input::placeholder,.onboarding-flow-field textarea::placeholder{color:#777781}
+.onboarding-equipment-options{display:grid;grid-template-columns:1fr 1fr;border:0;padding:0;margin:12px 0 26px;gap:10px}
+.onboarding-equipment-options legend{font-size:12px;color:#a0a0aa;margin-bottom:12px}
+.onboarding-equipment-options label{display:flex;align-items:center;gap:9px;min-height:44px;padding:10px;border:1px solid #33333a;border-radius:11px;font-size:12px;cursor:pointer}
+.onboarding-equipment-options input{accent-color:#fff;width:16px;height:16px}
+.onboarding-flow-primary{display:flex;align-items:center;justify-content:center;gap:10px;min-height:54px;border-radius:14px;width:100%;padding:14px 18px;background:#eee;color:#111;font-size:14px;font-weight:650;border:1px solid #eee;margin-top:22px}
+.onboarding-flow-skip{width:100%;min-height:44px;color:#b8b8c0;background:transparent;padding:14px;font-size:12px;text-decoration:underline;text-underline-offset:4px}
+.onboarding-flow-card>p.onboarding-flow-private{margin:18px 0 0;font-size:11px;text-align:center;color:#92929c}
+.onboarding-flow-card>p.onboarding-flow-error{border:1px solid #74747d;background:#242429;border-radius:12px;padding:12px 14px;color:#eee;margin:12px 0 0}
+.onboarding-review-fields{border-top:1px solid #303036;margin-top:20px}
+.onboarding-review-fields>button{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;min-height:64px;width:100%;text-align:left;border-bottom:1px solid #2e2e35;color:#eee;background:transparent}
+.onboarding-review-fields small{display:block;font-size:10px;color:#9999a3;margin-bottom:5px}
+.onboarding-review-fields strong{display:block;font-size:13px;font-weight:500;line-height:1.5;overflow-wrap:anywhere}
+.onboarding-edit{display:flex;align-items:center;gap:3px;font-size:11px;color:#b7b7c1;flex-shrink:0}
+.onboarding-ready-sessions{display:grid;gap:10px;margin-top:22px}
+.onboarding-ready-sessions details{border:1px solid #393940;border-radius:14px;background:#18181c;padding:14px}
+.onboarding-ready-sessions summary{display:flex;gap:12px;align-items:center;list-style:none;cursor:pointer;min-height:44px}
+.onboarding-ready-sessions summary::-webkit-details-marker{display:none}
+.onboarding-day-letter{width:34px;height:38px;border:1px solid #5b5b64;border-radius:9px;display:grid;place-items:center;flex-shrink:0;font-size:15px}
+.onboarding-ready-sessions summary>span:nth-child(2){flex:1;min-width:0}
+.onboarding-ready-sessions summary strong{display:block;font-size:14px;font-weight:500}
+.onboarding-ready-sessions summary small{display:flex;gap:5px;align-items:center;font-size:10px;margin-top:6px;color:#a5a5af}
+.onboarding-ready-sessions details[open] summary>svg{transform:rotate(90deg)}
+.onboarding-ready-sessions ol{padding:14px 0 0 22px;margin:10px 0 0;border-top:1px solid #35353d}
+.onboarding-ready-sessions li{padding:7px 0;font-size:12px;line-height:1.5}
+.onboarding-ready-sessions li small{display:block;color:#a0a0aa;font-size:10px;margin-top:3px}
+.onboarding-ready-sessions details>p{font-size:10px;color:#aaaab4;margin:10px 0 0;line-height:1.6}
+.onboarding-flow-card>p.onboarding-flow-safety{padding:12px;border:1px solid #42424a;border-radius:12px;margin:20px 0 0;font-size:12px}
+@media(max-width:700px){.onboarding-flow{padding:12px 12px calc(24px + env(safe-area-inset-bottom))}.onboarding-flow-progress{margin-bottom:18px}.onboarding-flow-header{margin-bottom:10px}.onboarding-flow-card{padding:24px 20px;border-radius:22px}.onboarding-flow-card h1{font-size:28px}.onboarding-flow-choices button{min-height:54px}.onboarding-flow-card>p{font-size:13px}.onboarding-flow-primary{min-height:54px}}
+@media(max-width:350px){.onboarding-flow-card{padding:22px 16px}.onboarding-flow-card h1{font-size:25px}.onboarding-equipment-options{grid-template-columns:1fr}.onboarding-flow-header{letter-spacing:.05em}}
+@media(prefers-reduced-motion:reduce){.onboarding-flow-progress>span{transition:none}}

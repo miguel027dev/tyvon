@@ -87,7 +87,8 @@ def validate_account_state(raw, email):
                     if not isinstance(raw_set, dict):
                         continue
                     try:
-                        reps = min(100, max(0, int(float(raw_set.get("reps") or 0))))
+                        unit = "seconds" if raw_set.get("unit") == "seconds" else "reps"
+                        reps = min(600 if unit == "seconds" else 100, max(0, int(float(raw_set.get("reps") or 0))))
                         weight = min(500, max(0, float(raw_set.get("weight") or 0)))
                         rir = min(5, max(0, float(raw_set["rir"]))) if raw_set.get("rir") is not None else None
                         target_rir = min(5, max(0, float(raw_set["targetRir"]))) if raw_set.get("targetRir") is not None else None
@@ -101,6 +102,7 @@ def validate_account_state(raw, email):
                         "setIndex": set_index,
                         "weight": weight,
                         "reps": reps,
+                        "unit": unit,
                         "rir": rir,
                         "targetRir": target_rir,
                         "completed": raw_set.get("completed") is True,
@@ -160,7 +162,7 @@ def load_state(conn, user_id, email):
         sets_by_log = {log_id: [] for log_id in log_ids}
         if log_ids:
             cur.execute("""
-              SELECT workout_id,exercise_id,exercise_name,muscle_group,set_index,weight,reps,rir,target_rir,completed
+              SELECT workout_id,exercise_id,exercise_name,muscle_group,set_index,weight,reps,rir,target_rir,completed,unit
               FROM tyvon_workout_sets
               WHERE workout_id=ANY(%s)
               ORDER BY workout_id,set_index,id
@@ -173,6 +175,7 @@ def load_state(conn, user_id, email):
                     "setIndex": row["set_index"],
                     "weight": float(row["weight"] or 0),
                     "reps": int(row["reps"] or 0),
+                    "unit": row["unit"],
                     "rir": float(row["rir"]) if row["rir"] is not None else None,
                     "targetRir": float(row["target_rir"]) if row["target_rir"] is not None else None,
                     "completed": bool(row["completed"]),
@@ -278,12 +281,12 @@ def persist_state(conn, user_id, email, raw, expected_revision=None, migration_m
                 for set_log in log["setLogs"]:
                     cur.execute("""
                       INSERT INTO tyvon_workout_sets(
-                        workout_id,exercise_id,exercise_name,muscle_group,set_index,weight,reps,rir,target_rir,completed
-                      ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        workout_id,exercise_id,exercise_name,muscle_group,set_index,weight,reps,rir,target_rir,completed,unit
+                      ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (
                         log["id"], set_log["exerciseId"], set_log["exerciseName"], set_log["group"],
                         set_log["setIndex"], set_log["weight"], set_log["reps"], set_log["rir"],
-                        set_log["targetRir"], set_log["completed"],
+                        set_log["targetRir"], set_log["completed"], set_log["unit"],
                     ))
 
         next_revision = max(1, current_revision + (0 if migration_mode and current_revision else 1))

@@ -1,0 +1,10 @@
+/* App interactions: keep controls reachable alongside the keyboard and system UI. */
+@media(max-width:700px){
+ .chat-stage{height:var(--chat-height,100dvh);padding-top:env(safe-area-inset-top)}
+ .chat-navigation button,.reference-compose .suggestions button{min-height:44px}
+ .composer-actions .composer-send,.composer-brand .composer-back{min-width:48px;min-height:48px}
+ .app-dock button,.training-context-actions button{min-height:48px}
+ .onboarding-flow{padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}
+ .entry input,.profile-form input,.profile-form select{font-size:16px}
+ .session-exercise-guide>summary{min-height:36px;display:flex;align-items:center}
+}

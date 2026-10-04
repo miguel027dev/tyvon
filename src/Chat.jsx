@@ -9,18 +9,17 @@ import WorkoutCards from './WorkoutCards';
 import {makePlan,selectWorkoutCards,sanitizeWorkoutCards} from '../shared/workouts.js';
 import {steps,parseAnswer,coachReply,onboardingQuestion} from './logic';
 import {apiFetch} from './api.js';
-import {chatWorkoutDraftKey,readChatWorkoutDraft,clearWorkoutDraft} from './workout-draft.js';
+import {chatWorkoutDraftKey,readChatWorkoutDraft,clearWorkoutDraft,workoutDraftKey,readWorkoutDraft} from './workout-draft.js';
+import {normalizeTrainingText,createTrainingSession,trainingDialogue,setDescription,timedExercise} from './training-dialogue.js';
+import './training-dialogue.css';
 
 function plainResponse(text,cards){return readableResponse(text,{fallback:cards?.length?'Seu treino está nos cards abaixo.':''})}
-const clean=text=>String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-const numberFrom=text=>{const m=String(text||'').match(/\d+(?:[.,]\d+)?/);return m?Number(m[0].replace(',','.')):NaN};
-const repsFrom=text=>{const m=String(text||'').match(/(\d+)\s*(?:rep|reps|repet)/i);return m?Number(m[1]):NaN};
-const weightFrom=text=>{const m=String(text||'').match(/(\d+(?:[.,]\d+)?)\s*(?:kg|quilo|quilos)/i);return m?Number(m[1].replace(',','.')):NaN};
-const firstTarget=target=>{const m=String(target||'').match(/\d+/);return m?Number(m[0]):1};
+const clean=normalizeTrainingText;
 const format=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`;
 
-export default function Chat({request,clearRequest,profile,p,setProfile,messages,setMessages,onboard,step,setStep,completed,plan,go,saveStatus,start,nextWorkoutId=0,onWorkoutComplete,userId}){
+export default function Chat({request,clearRequest,profile,p,setProfile,messages,setMessages,onboard,step,setStep,completed,plan,go,saveStatus,start,nextWorkoutId=0,onWorkoutComplete,userId,logs=[]}){
  const [busy,setBusy]=useState(false),[thinking,setThinking]=useState(false),[connection,setConnection]=useState(null),[preview,setPreview]=useState(false),[error,setError]=useState('');
+ const [showSessionSheet,setShowSessionSheet]=useState(false);
  const [chatSession,setChatSession]=useState(()=>readChatWorkoutDraft(localStorage,chatWorkoutDraftKey(userId))),[chatNow,setChatNow]=useState(()=>Date.now());
  useEffect(()=>{const key=chatWorkoutDraftKey(userId);if(!key)return;if(chatSession){try{localStorage.setItem(key,JSON.stringify({session:chatSession,updatedAt:Date.now()}))}catch{}}else clearWorkoutDraft(localStorage,key)},[chatSession,userId]);
  const historyContainer=useRef(null),followBottom=useRef(true),timer=useRef(null),controller=useRef(null);
@@ -41,75 +40,51 @@ export default function Chat({request,clearRequest,profile,p,setProfile,messages
  }
 
  function selectWorkout(text){
-  const t=clean(text),letter=t.match(/treino\s+([a-e])/);
-  if(letter)return plan[Math.min(letter[1].charCodeAt(0)-97,plan.length-1)];
+  const t=clean(text),letter=t.match(/treino\s+([a-e])\b/);
+  if(letter)return plan[letter[1].charCodeAt(0)-97];
   return plan[Math.min(Math.max(0,nextWorkoutId),plan.length-1)];
  }
 
- async function finishChatSet(session,weight,reps){
-  if(!Number.isFinite(Number(weight))||Number(weight)<0||Number(weight)>500||!Number.isInteger(Number(reps))||Number(reps)<1||Number(reps)>100)return {reply:'Confira os valores: carga entre 0 e 500 kg e registro entre 1 e 100. A série ainda não foi salva.'};
-  const exercise=session.workout.exercises[session.exerciseIndex],setIndex=session.setIndex;
-  const setLog={exerciseId:exercise.id||'exercise-'+session.exerciseIndex,exerciseName:exercise.name,group:exercise.group||'',setIndex:setIndex+1,weight:Number(weight||0),reps:Number(reps||firstTarget(exercise.reps)),rir:null,targetRir:Number(exercise.targetRir??2),completed:true};
-  const setLogs=[...session.setLogs,setLog],isLastSet=setIndex>=exercise.sets-1,isLastExercise=session.exerciseIndex>=session.workout.exercises.length-1;
-  if(isLastSet&&isLastExercise){
-   const minutes=Math.max(1,Math.round((Date.now()-session.startedAt)/60000));
-   setBusy(true);const saved=await onWorkoutComplete?.({workoutId:session.workout.id,workoutName:session.workout.name,name:session.workout.name,minutes,sets:setLogs.length,weights:{},setLogs,feedback:{mode:'chat'}});setBusy(false);
-   if(saved===false)return {reply:'A última série ainda não foi salva. Seu treino continua aqui. Tente registrar essa série novamente quando a conexão voltar.'};
-   setChatSession(null);
-   return {reply:`Treino concluído e salvo. Foram ${setLogs.length} séries registradas em cerca de ${minutes} min. Se quiser, abra Minha evolução para ver o histórico.`,done:true};
-  }
-  const nextExerciseIndex=isLastSet?session.exerciseIndex+1:session.exerciseIndex,nextSetIndex=isLastSet?0:setIndex+1,nextExercise=session.workout.exercises[nextExerciseIndex],restSeconds=exercise.restSeconds||90;
-  setChatSession({...session,exerciseIndex:nextExerciseIndex,setIndex:nextSetIndex,setLogs,awaiting:null,draftWeight:null,restEndsAt:Date.now()+restSeconds*1000});
-  const saved=exercise.equipment==='Peso corporal'?`${setLog.reps} reps`:`${setLog.weight} kg × ${setLog.reps}`;
-  return {reply:isLastSet?`Salvei ${saved}. ${exercise.name} concluído. Descanso de ${format(restSeconds)} e depois vamos para ${nextExercise.name}, série 1 de ${nextExercise.sets}.`:`Salvei ${saved}. Descanso de ${format(restSeconds)}. Depois vem a série ${nextSetIndex+1} de ${exercise.sets} de ${exercise.name}.`};
+ function storeSession(session){
+  const key=chatWorkoutDraftKey(userId);
+  if(key){try{if(session)localStorage.setItem(key,JSON.stringify({session,updatedAt:Date.now()}));else clearWorkoutDraft(localStorage,key)}catch{}}
+  setChatSession(session);
  }
-
+ async function saveChatSession(session,partial=false){
+  storeSession(session);setBusy(true);
+  try{
+   if(!onWorkoutComplete)throw new Error('Registro indisponível');
+   const saved=await onWorkoutComplete({id:session.id||`chat-${userId}-${session.startedAt}`,workoutId:session.workout.id,workoutName:session.workout.name,name:session.workout.name+(partial?' · parcial':''),minutes:Math.max(1,Math.round((Date.now()-session.startedAt)/60000)),sets:session.setLogs.length,weights:{},setLogs:session.setLogs,feedback:{mode:'chat',...(partial?{partial:true}:{})}});
+   if(saved===false)return false;
+   storeSession(null);return true;
+  }catch{return false}finally{setBusy(false)}
+ }
  async function handleWorkoutMessage(text){
   if(onboard)return false;
-  const t=clean(text),startIntent=/\b(comecei|comecar|começar|iniciar|bora|vamos)\b/.test(t)&&(/\btreino\b/.test(t)||t==='comecei'||t==='bora');
+  const t=clean(text),startIntent=/\b(comecei|comecar|iniciar|bora|vamos)\b/.test(t)&&(/\btreino\b/.test(t)||t==='comecei'||t==='bora');
   if(!chatSession&&startIntent){
+   if(readWorkoutDraft(localStorage,workoutDraftKey(userId))){appendLocal(text,"Você já tem um treino em andamento. Volte ao Início e toque em Continuar treino para retomá-lo.");return true}
    const workout=selectWorkout(text),exercise=workout?.exercises?.[0];
-   if(!workout||!exercise)return false;
-   setChatSession({workout,exerciseIndex:0,setIndex:0,setLogs:[],startedAt:Date.now(),awaiting:null,draftWeight:null,restEndsAt:0});
-   appendLocal(text,`Começamos ${workout.name}. Primeiro: ${exercise.name}, ${exercise.sets} séries de ${exercise.reps}. Quando terminar a primeira série, me diga “terminei”.`);
+   if(!workout||!exercise){appendLocal(text,"Essa ficha não está no seu plano. Confira as fichas em Meus treinos e escolha uma delas.");return true}
+   storeSession(createTrainingSession(workout));
+   appendLocal(text,`Começamos ${workout.name}. Primeiro: ${exercise.name}, ${exercise.sets} séries de ${exercise.reps}. Registre como “fiz a série 1 com 20 kg e 10 reps” ou me diga em qual exercício está.`);
    return true;
   }
   if(!chatSession)return false;
-  const exercise=chatSession.workout.exercises[chatSession.exerciseIndex];
-
-  if(/\b(cancelar|sair do treino|encerrar treino)\b/.test(t)){
+  if(/\b(cancelar|sair do treino|encerrar treino|salvar treino)\b/.test(t)){
    if(chatSession.setLogs.length){
-    const minutes=Math.max(1,Math.round((Date.now()-chatSession.startedAt)/60000));
-    setBusy(true);const saved=await onWorkoutComplete?.({workoutId:chatSession.workout.id,workoutName:chatSession.workout.name,name:chatSession.workout.name+' · parcial',minutes,sets:chatSession.setLogs.length,weights:{},setLogs:chatSession.setLogs,feedback:{mode:'chat',partial:true}});setBusy(false);
-    if(saved===false){appendLocal(text,'Não foi possível salvar o treino parcial. Seus registros continuam aqui. Tente encerrar novamente quando a conexão voltar.');return true}
-    appendLocal(text,`Treino parcial salvo com ${chatSession.setLogs.length} séries.`);
-   }else appendLocal(text,'Treino encerrado sem registros.');
-   setChatSession(null);return true;
+    const total=chatSession.workout.exercises.reduce((sum,e)=>sum+e.sets,0),partial=chatSession.setLogs.length<total;
+    const saved=await saveChatSession(chatSession,partial);
+    appendLocal(text,saved?`Treino ${partial?'parcial ':''}salvo com ${chatSession.setLogs.length} séries.`:'Não foi possível salvar agora. Seus registros continuam neste aparelho. Tente salvar novamente quando a conexão voltar.');
+   }else{storeSession(null);appendLocal(text,'Treino encerrado sem registros.');}
+   return true;
   }
-  if(/\b(pular|sem descanso|proxima|próxima)\b/.test(t)&&rest>0){
-   setChatSession({...chatSession,restEndsAt:0});appendLocal(text,`Descanso encerrado. Próxima: ${exercise.name}, série ${chatSession.setIndex+1} de ${exercise.sets}.`);return true;
-  }
-
-  if(chatSession.awaiting==='weight'){
-   const weight=Number.isFinite(weightFrom(text))?weightFrom(text):numberFrom(text),reps=repsFrom(text);
-   if(!Number.isFinite(weight)||weight<0||weight>500){appendLocal(text,'Me diga a carga em kg. Exemplo: “20 kg”.');return true}
-   if(Number.isFinite(reps)&&reps>0&&reps<=100){const result=await finishChatSet(chatSession,weight,reps);appendLocal(text,result.reply);return true}
-   setChatSession({...chatSession,awaiting:'reps',draftWeight:weight});appendLocal(text,`Anotei ${weight} kg. Quantas repetições você fez nessa série?`);return true;
-  }
-  if(chatSession.awaiting==='reps'){
-   const reps=Number.isFinite(repsFrom(text))?repsFrom(text):numberFrom(text);
-   if(!Number.isFinite(reps)||reps<1||reps>100){appendLocal(text,'Me diga quantas repetições você fez. Exemplo: “10 reps”.');return true}
-   const result=await finishChatSet(chatSession,chatSession.draftWeight||0,reps);appendLocal(text,result.reply);return true;
-  }
-
-  const setDone=/\b(terminei|acabei|conclui|concluí|fiz)\b/.test(t)&&(/\b(serie|série)\b/.test(t)||t==='terminei'||t==='acabei');
-  if(setDone){
-   const weight=weightFrom(text),reps=repsFrom(text),weighted=exercise.equipment!=='Peso corporal';
-   if(weighted&&!Number.isFinite(weight)){setChatSession({...chatSession,awaiting:'weight'});appendLocal(text,`Boa. Qual foi a carga na série ${chatSession.setIndex+1} de ${exercise.name}? Pode mandar só “20 kg”.`);return true}
-   if(!Number.isFinite(reps)){setChatSession({...chatSession,awaiting:'reps',draftWeight:weighted?weight:0});appendLocal(text,`Certo. Quantas repetições você fez nessa série?`);return true}
-   const result=await finishChatSet(chatSession,weighted?weight:0,reps);appendLocal(text,result.reply);return true;
-  }
-  return false;
+  const result=trainingDialogue(chatSession,text);
+  if(!result.handled)return false;
+  storeSession(result.session);
+  if(result.complete){const saved=await saveChatSession(result.session);appendLocal(text,result.reply+(saved?' Treino concluído e salvo. Veja seu histórico em Minha evolução.':' O salvamento não foi concluído. Todas as séries continuam aqui: toque em Salvar treino para tentar novamente.'));}
+  else appendLocal(text,result.reply);
+  return true;
  }
 
  async function send(text,base=messages){
@@ -178,7 +153,7 @@ ${next.age<18?'Vamos priorizar técnica, recuperação e acompanhamento profissi
  }
  function retry(){const idx=messages.findLastIndex(m=>m.role==='user');if(idx>=0)send(messages[idx].text,messages.slice(0,idx))}
  const placeholders={name:'Digite seu nome',age:'Quantos anos você tem?',height:'Sua altura em cm',weight:'Digite seu peso em kg',goal:'Qual é o seu objetivo?',experience:'Como está sua experiência?',equipment:'Quais equipamentos você tem?',days:'Quantos dias por semana?',sessionMinutes:'Quanto tempo por treino?',limitations:'Existe alguma restrição?'};
- const suggestions=chatSession?(rest>0?['Pular descanso','Terminei a série','Encerrar treino']:['Terminei a série','Encerrar treino']):(onboard?current?.chips:['Começar treino de hoje','Qual treino faço hoje?','Como escolher a carga?','Como organizar meu descanso?']);
+ const suggestions=chatSession?(chatSession.setLogs.length===chatSession.workout.exercises.reduce((sum,e)=>sum+e.sets,0)?['Salvar treino']:rest>0?['Pular descanso','Encerrar treino']:['Encerrar treino']):(onboard?current?.chips:['Começar treino de hoje','Qual treino faço hoje?','Como escolher a carga?','Como organizar meu descanso?']);
 
  return <div className={'chat-page reference-chat '+(onboard?'onboarding-chat':'regular-chat')}><div className="chat-stage">
   <div className="chat-navigation"><button className="chat-back" disabled={busy&&onboard} aria-label={onboard?'Pausar apresentação':'Voltar ao painel'} onClick={()=>go(onboard?'entry':'overview')}><ChevronLeft size={19}/><span>{onboard?'Pausar':'Meu espaço'}</span></button><span className="chat-session-label">{onboard?`Seu perfil · ${step+1} de ${steps.length}`:preview?'Prévia demonstrativa':chatSession?'TREINO AO VIVO':'TYVON AI'}</span><button disabled={busy&&onboard} className="chat-profile-link" onClick={()=>go(onboard?'entry':'profile')}>{onboard?'Continuar depois':'Perfil'}{!onboard&&<ArrowUpRight size={13}/>}</button></div>
@@ -190,7 +165,13 @@ ${next.age<18?'Vamos priorizar técnica, recuperação e acompanhamento profissi
   </div>
   <div className="reference-compose">
    {!onboard&&!chatSession&&<div className="chat-quick-workout"><div><span>SUA FICHA DE HOJE</span><strong>{plan[nextWorkoutId]?.name}</strong><small>{plan[nextWorkoutId]?.minutes} min · {plan[nextWorkoutId]?.exercises.length} exercícios</small></div><button disabled={busy} onClick={()=>start(plan[nextWorkoutId])}>Começar treino<ArrowUpRight size={16}/></button></div>}
-   {chatSession&&liveExercise&&<div className="chat-workout-strip"><div><span>AGORA</span><strong>{liveExercise.name}</strong><small>Série {chatSession.setIndex+1}/{liveExercise.sets} · {liveExercise.reps}</small></div>{rest>0?<div className="chat-rest-clock"><Clock size={15}/><span>Descanso</span><strong>{format(rest)}</strong></div>:<span className="chat-ready">Pronto para registrar</span>}</div>}
+   {chatSession&&liveExercise&&<section className="training-context-card" aria-label="Treino em andamento">
+    <div className="training-context-top"><span>{chatSession.workout.name}</span><strong>{chatSession.setLogs.length}/{chatSession.workout.exercises.reduce((sum,e)=>sum+e.sets,0)} séries</strong></div>
+    <div className="training-context-main"><div><h2>{liveExercise.name}</h2><p>Série {chatSession.setIndex+1}/{liveExercise.sets} · alvo {liveExercise.reps}</p></div>{rest>0?<span className="training-context-rest"><Clock size={14}/>{format(rest)}</span>:<span className="training-context-ready">{chatSession.awaiting==='weight'?'Informe a carga':chatSession.awaiting==='reps'?`Informe ${timedExercise(liveExercise)?'os segundos':'as reps'}`:'Pronto para registrar'}</span>}</div>
+    <div className="training-context-previous"><span>Anterior</span><strong>{(()=>{for(let i=logs.length-1;i>=0;i--){const previous=(logs[i].setLogs||[]).find(s=>s.completed&&s.exerciseId===liveExercise.id&&s.setIndex===chatSession.setIndex+1);if(previous)return setDescription({...previous,unit:timedExercise(liveExercise)?'seconds':'reps'})}return 'Primeiro registro desta série'})()}</strong></div>
+    <div className="training-context-actions"><button disabled={busy} onClick={()=>send('Terminei a série')}>Registrar série</button><button disabled={busy} onClick={()=>send(`Estou na série ${chatSession.setIndex+1}`)}>Me guiar</button><button aria-expanded={showSessionSheet} onClick={()=>setShowSessionSheet(v=>!v)}>Ficha</button><button disabled={busy||!chatSession.setLogs.length} onClick={()=>send('Desfazer última série')}>Desfazer</button></div>
+    {showSessionSheet&&<div className="training-context-sheet">{chatSession.workout.exercises.map((exercise,i)=><button key={exercise.id||i} disabled={busy} onClick={()=>{send(`Estou no ${exercise.name}`);setShowSessionSheet(false)}}><span>{exercise.name}</span><small>{chatSession.setLogs.filter(s=>s.exerciseId===exercise.id).length}/{exercise.sets} · {exercise.reps}</small></button>)}</div>}
+   </section>}
    {!onboard&&!chatSession&&connection&&!connection.configured&&<div className="connection-note"><span>{preview?'Você está explorando respostas de exemplo.':'O TYVON AI está indisponível no momento.'}</span><button onClick={()=>setPreview(!preview)} disabled={busy}>{preview?'Sair da prévia':'Experimentar prévia'}<ArrowUpRight size={12}/></button></div>}
    <div className="suggestions">{suggestions?.map(c=><button key={c} disabled={busy} onClick={()=>send(c)}>{c}</button>)}</div>
    {onboard&&current?.hint&&<p className="input-hint">{current.hint}</p>}

@@ -53,6 +53,6 @@ def normalize_profile(raw, email=""):
         "limitations": limitations,
         "complete": raw.get("complete") is True,
     }
-    if out["complete"] and not all([out["age"], out["weight"], out["goal"], out["experience"], out["equipment"], out["days"], out["limitations"]]):
+    if out["complete"] and not all([out["age"], out["goal"], out["experience"], out["equipment"], out["days"], out["limitations"]]):
         raise ValueError("Conclua as perguntas do perfil.")
     return out
