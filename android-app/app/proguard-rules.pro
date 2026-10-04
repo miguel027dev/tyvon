@@ -1,3 +1,3 @@
--keepclassmembers class com.tyvon.intelligence.MainActivity$TyvonBridge {
-    public *;
+-keepclassmembers class com.tyvon.intelligence.MainActivity$DownloadBridge {
+    @android.webkit.JavascriptInterface <methods>;
 }

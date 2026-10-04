@@ -100,6 +100,21 @@ function App(){
   if(next!=='chat')setChatRequest(null);
   setRoute(next);setMobile(false);window.scrollTo(0,0);
  }
+ useEffect(()=>{
+  function back(event){
+   if(finalizing.current){event.preventDefault();return}
+   if(planReveal){event.preventDefault();setPlanReveal(null);return}
+   if(activeWorkout){event.preventDefault();setActiveWorkout(null);setSessionDraft(null);go('overview');return}
+   if(route!=='entry'&&route!=='overview'){event.preventDefault();go(profile?.complete?'overview':'entry')}
+  }
+  function navigate(event){
+   if(!['overview','profile'].includes(event.detail?.route))return;
+   event.preventDefault();if(finalizing.current)return;
+   setActiveWorkout(null);setSessionDraft(null);go(event.detail.route);
+  }
+  window.addEventListener('tyvon:native-back',back);window.addEventListener('tyvon:native-navigate',navigate);
+  return()=>{window.removeEventListener('tyvon:native-back',back);window.removeEventListener('tyvon:native-navigate',navigate)};
+ },[route,profile?.complete,activeWorkout,planReveal]);
  async function create(imported=false){
   if(profile){go('chat');return}
   const raw=imported?legacy.current:null;
