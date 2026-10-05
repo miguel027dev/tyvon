@@ -15,10 +15,12 @@ Package `com.tyvon.intelligence`, versionCode 3, minSdk 24, targetSdk 36. APK e 
 - `npm run build`: passou, incluindo 34 testes frontend e 36 testes backend. Vite emitiu aviso de tamanho de chunks acima de 500 KB.
 - Navegador Chromium móvel 412 × 915: site HTTP200, título TYVON, sem erros de JavaScript capturados, largura do conteúdo igual à viewport (sem overflow horizontal), tela de login com e-mail/senha, termos e privacidade HTTP200.
 - `git diff --check`: passou.
+- GitHub Actions no PR #11: CI web e Android validation passaram; Android remoto executou assembleDebug e lintDebug.
+- Readiness pública `/api/health/ready`: HTTP200, serviço e banco prontos.
 
 ## Limites
 
-A inspeção do código e os checks de artefatos não substituem teste funcional Android. Um emulador API36 foi preparado sem aceleração (não há `/dev/kvm` neste ambiente); seu resultado é registrado na entrega. Não foi fornecida uma conta de revisão, portanto não houve validação autenticada de login, sincronização, treino completo, cards ou exclusão real. Não houve teste em aparelho físico nem envio à Google Play.
+A inspeção do código e os checks de artefatos não substituem teste funcional Android. Um emulador API36 foi preparado sem aceleração (não há `/dev/kvm` neste ambiente), mas não concluiu o boot em cerca de dez minutos. A instalação foi recusada pelo Android com “device is still booting”; não houve teste funcional dentro da WebView nem captura Android válida. O emulador foi encerrado. Não foi fornecida uma conta de revisão, portanto não houve validação autenticada de login, sincronização, treino completo, cards ou exclusão real. Não houve teste em aparelho físico nem envio à Google Play.
 
 Capturas na pasta `validacao-web` são evidência do site no navegador, não capturas Android para a loja.
 
