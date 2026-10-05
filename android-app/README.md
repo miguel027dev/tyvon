@@ -1,34 +1,25 @@
-# TYVON Android — WebView
+# TYVON Android 1.2.0
 
-URL: `https://rep-kky9.onrender.com/`. Android 7.0 (API24) ou posterior; versão1.1.0, código2.
+WebView Android integrada ao sistema em https://rep-kky9.onrender.com/, package `com.tyvon.intelligence`, versionCode 3, Android 7.0+ (min 24), target 36.
 
-## Comportamento
+Sem barra extra de navegador, menus duplicados ou linha de progresso. Abertura com a marca, erros nativos com nova tentativa, respeito a barras do sistema/teclado e navegação Voltar integrada ao React. HTTPS obrigatório, cookies persistentes, seletor Android para uploads/cards, sem permissões amplas de arquivos.
 
-- Barra nativa com Voltar e menu: Início, Perfil e ajustes, Recarregar, Abrir no navegador e Sobre.
-- Voltar conversa com a navegação React antes de usar histórico da WebView ou confirmar saída. Sair de uma sessão guiada pela barra preserva seu rascunho local.
-- Cookies e armazenamento local mantêm a sessão no aparelho; logout continua nas opções da conta no site. A validade da sessão é determinada pelo servidor.
-- Layout respeita barras do sistema e teclado; orientação livre.
-- HTTPS obrigatório, acesso a arquivos locais desabilitado e links externos no navegador.
-- Erros de conexão/servidor têm botão Tentar novamente.
-- Uploads usam o seletor do Android. Cards PNG gerados pela aplicação podem ser salvos via seletor de destino, sem permissão ampla de armazenamento.
-- Ponte de download limitada a PNG, até8MiB, com nonce de uma única solicitação e origem principal TYVON. Nenhuma credencial é exposta pela ponte.
-
-**Login Google:** abre o fluxo no navegador, onde a conta funciona. A sessão do navegador é separada da WebView. Para autenticar dentro deste APK, use e-mail/senha. Integrar Google nativo ou retorno seguro de autenticação requer uma etapa própria; este APK não afirma oferecer isso.
+Acesso autenticado dentro do app por e-mail e senha. Google abre externamente e não transfere a sessão do navegador à WebView. O sistema remoto continua dependendo de internet e da Render. Mudanças web são servidas pelo site; mudanças nativas exigem novo artefato.
 
 ## Compilar
 
-JDK17, Android SDK API35, Build Tools35 e Gradle8.9. Na pasta `android-app`:
+JDK 17 completo, SDK 36 e Build Tools 36. Configurar `ANDROID_HOME` ou `local.properties`. Usar o Gradle Wrapper 8.13 incluído:
 
 ```bash
-gradle --no-daemon :app:assembleDebug :app:lintDebug
+./gradlew :app:assembleDebug :app:lintDebug
 ```
 
-APK debug instalável assinado para testes: `app/build/outputs/apk/debug/app-debug.apk`. Não é um AAB assinado com chave definitiva para publicação na loja. A assinatura de testes precisa ser mantida para atualizar a mesma instalação.
+Release requer as variáveis `TYVON_KEYSTORE_PATH`, `TYVON_KEYSTORE_PASSWORD`, `TYVON_KEY_ALIAS`, `TYVON_KEY_PASSWORD`, usando uma chave de upload privada. Não gravar valores no repositório.
 
-As funcionalidades web carregadas do servidor recebem as atualizações de deploy. Alterações do código nativo exigem novo APK.
+```bash
+./gradlew :app:assembleRelease :app:bundleRelease :app:lintRelease
+```
 
-## APK entregue
+Saídas: `app/build/outputs/apk/release/app-release.apk` e `app/build/outputs/bundle/release/app-release.aab`. A assinatura de upload desta entrega é nova, diferente da chave de testes anterior. Guardar o backup privado para próximas versões.
 
-`TYVON-1.1.0.apk` foi gerado com `assembleRelease`, otimizado pelo R8, alinhamento conferido com zipalign e assinado com apksigner usando a chave Android de testes. A variante de release desativa debuggable. `lintRelease` passou sem erros. Não houve teste em aparelho físico nesta entrega.
-
-A interface web passou nos 70 testes e build de produção. O servidor precisa da atualização de `src/main.jsx` para receber os eventos nativos de Voltar e Perfil.
+Consulte [guia completo da Google Play](../docs/GOOGLE-PLAY-TYVON.md), incluindo pendências de exclusão de conta, declaração de dados, IA e testes reais antes da produção.
