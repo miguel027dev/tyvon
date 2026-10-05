@@ -26,8 +26,11 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
-import android.widget.ProgressBar;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.os.Handler;
+import android.os.Looper;
+
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.OutputStream;
@@ -40,7 +43,11 @@ public class MainActivity extends Activity {
     private static final int FILE_PICK = 701;
     private static final int FILE_SAVE = 702;
     private WebView webView;
-    private ProgressBar progress;
+    private FrameLayout shell;
+    private LinearLayout cover;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean failed;
+    private final Runnable loadTimeout = () -> showError("A conexão está demorando. Confira sua internet e tente novamente.");
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingDownload;
     private String downloadNonce;
@@ -54,32 +61,19 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        LinearLayout shell = new LinearLayout(this);
-        shell.setOrientation(LinearLayout.VERTICAL);
+        shell = new FrameLayout(this);
         shell.setBackgroundColor(Color.BLACK);
-        LinearLayout toolbar = new LinearLayout(this);
-        toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        toolbar.setBackgroundColor(Color.rgb(12, 12, 14));
-        Button back = toolbarButton("‹", "Voltar");
-        back.setOnClickListener(v -> navigateBack());
-        toolbar.addView(back, new LinearLayout.LayoutParams(dp(52), dp(48)));
-        TextView title = new TextView(this);
-        title.setText("TYVON"); title.setTextColor(Color.WHITE); title.setTextSize(17);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        toolbar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        Button menu = toolbarButton("⋮", "Opções do aplicativo");
-        menu.setOnClickListener(this::showOptions);
-        toolbar.addView(menu, new LinearLayout.LayoutParams(dp(52), dp(48)));
-        shell.addView(toolbar);
-        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
-        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
-        shell.addView(progress, new LinearLayout.LayoutParams(-1, dp(2)));
         webView = new WebView(this);
         webView.setBackgroundColor(Color.BLACK);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        shell.addView(webView, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(webView, new FrameLayout.LayoutParams(-1, -1));
+        cover = new LinearLayout(this);
+        cover.setOrientation(LinearLayout.VERTICAL);
+        cover.setGravity(Gravity.CENTER);
+        cover.setBackgroundColor(Color.BLACK);
+        cover.setPadding(dp(28), dp(28), dp(28), dp(28));
+        shell.addView(cover, new FrameLayout.LayoutParams(-1, -1));
+        showLaunch();
         setContentView(shell);
         if (Build.VERSION.SDK_INT >= 30) {
             shell.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -92,15 +86,11 @@ public class MainActivity extends Activity {
             shell.setFitsSystemWindows(true);
         }
         configureWebView();
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
+        }
         if (state == null || webView.restoreState(state) == null) webView.loadUrl(TYVON_URL);
-    }
-
-    private Button toolbarButton(String text, String description) {
-        Button button = new Button(this);
-        button.setText(text); button.setTextSize(25); button.setTextColor(Color.WHITE);
-        button.setContentDescription(description); button.setBackgroundColor(Color.TRANSPARENT);
-        button.setPadding(0, 0, 0, 0); button.setMinWidth(0); button.setMinimumWidth(0);
-        return button;
     }
 
     private boolean trusted(Uri uri) {
@@ -124,7 +114,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSupportZoom(false); settings.setBuiltInZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " TYVON-Android/1.1");
+        settings.setUserAgentString(settings.getUserAgentString() + " TYVON-Android/1.2");
         if (Build.VERSION.SDK_INT >= 26) settings.setSafeBrowsingEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
@@ -138,7 +128,7 @@ public class MainActivity extends Activity {
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public void onProgressChanged(WebView view, int value) {
-                progress.setProgress(value); progress.setVisibility(value < 100 ? View.VISIBLE : View.GONE);
+                // Loading is represented by the brand cover, with no browser progress bar.
             }
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (!onTrustedPage()) return false;
@@ -162,7 +152,26 @@ public class MainActivity extends Activity {
                 if (request.isForMainFrame()) external(uri);
                 return true;
             }
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
+                failed = false;
+                downloadNonce = null;
+                handler.removeCallbacks(loadTimeout);
+                handler.postDelayed(loadTimeout, 45000);
+            }
+            @Override public void onPageCommitVisible(WebView view, String url) {
+                if (!failed && trusted(Uri.parse(url))) {
+                    // Browser OAuth cannot transfer its session to this WebView.
+                    // Keep the Android login screen focused on supported credentials.
+                    view.evaluateJavascript("(()=>{if(document.getElementById('tyvon-android-style'))return;const s=document.createElement('style');s.id='tyvon-android-style';s.textContent='.google-login,.auth-divider,.entry-auth-note{display:none!important}';document.head.appendChild(s)})()", null);
+                    handler.removeCallbacks(loadTimeout);
+                    cover.setVisibility(View.GONE);
+                }
+            }
             @Override public void onPageFinished(WebView view, String url) { CookieManager.getInstance().flush(); }
+            @Override public void onReceivedSslError(WebView view, android.webkit.SslErrorHandler sslHandler, android.net.http.SslError error) {
+                sslHandler.cancel();
+                showError("Não foi possível estabelecer uma conexão segura. Tente novamente mais tarde.");
+            }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) showError("Não conseguimos abrir o TYVON. Confira a conexão e tente novamente.");
             }
@@ -175,30 +184,6 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void showOptions(View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add(0, 1, 0, "Início");
-        menu.getMenu().add(0, 2, 1, "Perfil e ajustes");
-        menu.getMenu().add(0, 3, 2, "Recarregar");
-        menu.getMenu().add(0, 4, 3, "Abrir no navegador");
-        menu.getMenu().add(0, 5, 4, "Sobre este aplicativo");
-        menu.setOnMenuItemClickListener(item -> {
-            switch (item.getItemId()) {
-                case 1: navigateTo("overview"); break;
-                case 2: navigateTo("profile"); break;
-                case 3: new AlertDialog.Builder(this).setTitle("Recarregar TYVON?").setMessage("A sessão da conta é mantida. O rascunho do treino salvo neste aparelho será retomado pela aplicação.").setNegativeButton("Cancelar", null).setPositiveButton("Recarregar", (d, w) -> webView.reload()).show(); break;
-                case 4: external(Uri.parse(onTrustedPage() ? webView.getUrl() : TYVON_URL)); break;
-                case 5: new AlertDialog.Builder(this).setTitle("TYVON 1.1").setMessage("Aplicativo WebView conectado ao TYVON. Requer internet. Conta, perfil, histórico e saída da sessão ficam nas opções do TYVON. Login Google utiliza o navegador; a sessão do navegador é separada da sessão do aplicativo.").setPositiveButton("Entendi", null).show(); break;
-            }
-            return true;
-        });
-        menu.show();
-    }
-    private void navigateTo(String route) {
-        if (!onTrustedPage()) { webView.loadUrl(TYVON_URL); return; }
-        String js = "(()=>{const e=new CustomEvent('tyvon:native-navigate',{cancelable:true,detail:{route:" + JSONObject.quote(route) + "}});window.dispatchEvent(e);return e.defaultPrevented})()";
-        webView.evaluateJavascript(js, result -> { if (!"true".equals(result)) webView.loadUrl(TYVON_URL); });
-    }
     private void navigateBack() {
         if (backing || webView == null) return;
         if (webView.canGoBack() && !onTrustedPage()) { webView.goBack(); return; }
@@ -207,16 +192,39 @@ public class MainActivity extends Activity {
         webView.evaluateJavascript(js, result -> {
             backing = false;
             if ("true".equals(result)) return;
+            if (webView == null || isFinishing()) return;
             if (webView.canGoBack()) webView.goBack();
             else new AlertDialog.Builder(this).setTitle("Sair do TYVON?").setMessage("Sua sessão fica salva neste aparelho. Você pode voltar depois.").setNegativeButton("Continuar", null).setPositiveButton("Sair", (d, w) -> finish()).show();
         });
     }
     @Override public void onBackPressed() { navigateBack(); }
 
+    private TextView coverText(String text, int size) {
+        TextView label = new TextView(this);
+        label.setText(text); label.setTextColor(Color.WHITE); label.setTextSize(size);
+        label.setGravity(Gravity.CENTER); label.setPadding(0, dp(12), 0, dp(12));
+        cover.addView(label, new LinearLayout.LayoutParams(-1, -2));
+        return label;
+    }
+    private void showLaunch() {
+        cover.removeAllViews(); cover.setVisibility(View.VISIBLE);
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.drawable.tyvon_mark); mark.setContentDescription("TYVON");
+        cover.addView(mark, new LinearLayout.LayoutParams(dp(104), dp(104)));
+        coverText("TYVON", 28);
+        coverText("Preparando seu espaço…", 14);
+    }
     private void showError(String message) {
-        progress.setVisibility(View.GONE);
-        String html = "<!doctype html><meta name='viewport' content='width=device-width,initial-scale=1'><style>body{margin:0;min-height:100vh;background:#090909;color:#eee;font:16px sans-serif;display:grid;place-items:center}main{padding:28px;max-width:420px;text-align:center}h1{font-size:34px}p{line-height:1.6;color:#aaa}a{display:block;padding:18px;background:#eee;color:#111;border-radius:16px;text-decoration:none;font-weight:bold}</style><main><b>TYVON</b><h1>Vamos tentar de novo.</h1><p>" + message + "</p><a href='" + TYVON_URL + "'>Tentar novamente</a></main>";
-        webView.loadDataWithBaseURL(TYVON_URL, html, "text/html", "UTF-8", null);
+        if (isFinishing() || webView == null) return;
+        failed = true; downloadNonce = null;
+        handler.removeCallbacks(loadTimeout);
+        webView.stopLoading();
+        cover.removeAllViews(); cover.setVisibility(View.VISIBLE);
+        coverText("TYVON", 28);
+        coverText(message, 16);
+        Button retry = new Button(this); retry.setText("Tentar novamente");
+        retry.setOnClickListener(v -> { showLaunch(); webView.loadUrl(TYVON_URL); });
+        cover.addView(retry, new LinearLayout.LayoutParams(-1, dp(56)));
     }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
 
@@ -256,6 +264,7 @@ public class MainActivity extends Activity {
     @Override protected void onPause() { CookieManager.getInstance().flush(); super.onPause(); }
     @Override protected void onDestroy() {
         if (fileCallback != null) fileCallback.onReceiveValue(null);
+        handler.removeCallbacksAndMessages(null);
         pendingDownload = null; downloadNonce = null;
         if (webView != null) { webView.stopLoading(); webView.removeJavascriptInterface("TyvonDownloads"); webView.destroy(); webView = null; }
         super.onDestroy();
