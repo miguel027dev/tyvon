@@ -1,10 +1,10 @@
 # TYVON — identidade visual
 
-A assinatura oficial da TYVON é a imagem branca sobre fundo preto fornecida para o projeto. O arquivo-fonte está em `public/brand/tyvon-logo.png` e deve ser usado sem redesenhar nem esticar o lettering.
+A assinatura oficial da TYVON preserva o lettering original. O arquivo-fonte está em `public/brand/tyvon-logo.png` (conteúdo JPEG, apesar da extensão). Para a interface, use `public/brand/tyvon-logo-transparent.svg`, que recorta o canvas excedente e torna a área preta transparente sem redesenhar as letras.
 
 ## Aplicação
 
-Use o wordmark em fundos pretos ou grafite. O favicon usa um T geométrico simples derivado da forma inicial do logotipo. Mantenha espaço ao redor, preserve a proporção e não acrescente contornos ou efeitos coloridos.
+Use o wordmark branco em fundos escuros com contraste suficiente. O arquivo SVG transparente não exige `mix-blend-mode` nem fundo preto próprio. O favicon usa um T geométrico simples derivado da forma inicial do logotipo. Mantenha espaço ao redor, preserve a proporção e não acrescente contornos ou efeitos coloridos.
 
 ## Interface
 
