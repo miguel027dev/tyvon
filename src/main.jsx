@@ -28,6 +28,7 @@ import './production.css';
 import './quick-start.css';
 import './app-experience.css';
 import './tyvon-glass.css';
+import './iron.css';
 import {workoutDraftKey,readWorkoutDraft,clearWorkoutDraft,chatWorkoutDraftKey,readChatWorkoutDraft} from './workout-draft.js';
 
 const nav=[

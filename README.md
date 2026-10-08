@@ -10,9 +10,9 @@ TYVON é um aplicativo de treino com experiência única, frontend React/Vite e 
 - IA: gateway server-side para NVIDIA Cloud com protocolo SSE próprio do TYVON.
 - Autenticação: senha Argon2id, Google OAuth/PKCE, sessão HttpOnly, CSRF e recuperação/verificação de e-mail.
 - Produção: Render Web Service + Render PostgreSQL.
-- Android: WebView endurecida apontando para a aplicação web publicada.
+- Android anterior: WebView. Novo cliente nativo em `android-native/`, com contrato versionado e limitações de lançamento documentadas.
 
-A aplicação usa uma única experiência TYVON, com identidade preto/grafite/branco e regras de treino centralizadas no motor do produto.
+A aplicação usa uma única experiência TYVON, com identidade Iron (grafite, papel e cobre) e regras de treino centralizadas no motor do produto.
 
 ## Treinos
 
@@ -21,7 +21,7 @@ O motor TYVON é a única fonte de plano ativa.
 Adultos recebem fichas completas conforme a frequência:
 
 - 2 dias: dois treinos de corpo inteiro.
-- 3 dias: três treinos de corpo inteiro.
+- 3 dias: Push/Pull/Pernas.
 - 4 dias: superiores/inferiores A/B.
 - 5 dias: Push/Pull/Pernas/Superiores/Inferiores.
 
