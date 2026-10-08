@@ -27,8 +27,14 @@ import './workout-experience.css';
 import './production.css';
 import './quick-start.css';
 import './app-experience.css';
+import './android-shell.css';
 import './tyvon-glass.css';
 import {workoutDraftKey,readWorkoutDraft,clearWorkoutDraft,chatWorkoutDraftKey,readChatWorkoutDraft} from './workout-draft.js';
+
+// A dedicated WebViewer presentation layer: it never changes the public website.
+if(typeof document!=='undefined' && typeof navigator!=='undefined' && /TYVON-Android\\//.test(navigator.userAgent)){
+ document.documentElement.classList.add('tyvon-android-shell');
+}
 
 const nav=[
  ['overview','Visão geral',LayoutDashboard],
@@ -105,13 +111,13 @@ function App(){
   function back(event){
    if(finalizing.current){event.preventDefault();return}
    if(planReveal){event.preventDefault();setPlanReveal(null);return}
-   if(activeWorkout){event.preventDefault();setActiveWorkout(null);setSessionDraft(null);go('overview');return}
+   if(activeWorkout){event.preventDefault();window.dispatchEvent(new Event('tyvon:request-exit-workout'));return}
    if(route!=='entry'&&route!=='overview'){event.preventDefault();go(profile?.complete?'overview':'entry')}
   }
   function navigate(event){
    if(!['overview','profile'].includes(event.detail?.route))return;
    event.preventDefault();if(finalizing.current)return;
-   setActiveWorkout(null);setSessionDraft(null);go(event.detail.route);
+   if(activeWorkout){window.dispatchEvent(new Event('tyvon:request-exit-workout'));return;}setSessionDraft(null);go(event.detail.route);
   }
   window.addEventListener('tyvon:native-back',back);window.addEventListener('tyvon:native-navigate',navigate);
   return()=>{window.removeEventListener('tyvon:native-back',back);window.removeEventListener('tyvon:native-navigate',navigate)};
