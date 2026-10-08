@@ -19,7 +19,7 @@ final class Api {
    vault.put("cookies",new JSONObject(cookies).toString());
    InputStream input=code>=400?c.getErrorStream():c.getInputStream();if(input==null)throw new Exception("Servidor indisponível ("+code+").");
    try(BufferedReader reader=new BufferedReader(new InputStreamReader(input,"UTF-8"))){
-    if(code<300&&stream!=null&&c.getContentType()!=null&&c.getContentType().contains("text/event-stream")){String line;while((line=reader.readLine())!=null){if(line.startsWith("data: ")){JSONObject event=new JSONObject(line.substring(6));stream.accept(event);}}return new JSONObject().put("ok",true);}
+    if(code<300&&stream!=null&&c.getContentType()!=null&&c.getContentType().contains("text/event-stream")){boolean done=false;String line;while((line=reader.readLine())!=null){if(line.startsWith("data: ")){JSONObject event=new JSONObject(line.substring(6));if(event.optString("type").equals("done"))done=true;stream.accept(event);}}if(!done)throw new Exception("A resposta foi interrompida. Tente novamente.");return new JSONObject().put("ok",true);}
     StringBuilder s=new StringBuilder();String line;while((line=reader.readLine())!=null){s.append(line);if(s.length()>1100000)throw new Exception("Resposta acima do limite.");}
     JSONObject j;try{j=new JSONObject(s.toString());}catch(Exception ignored){throw new Exception("Resposta inválida do servidor ("+code+").");}
     if(code>=300)throw new ApiError(code,j.optString("error","Falha de conexão."));if(stream!=null&&j.has("message")){stream.accept(new JSONObject().put("type","token").put("text",j.optString("message")+(j.has("workouts")?"\nAbra sua ficha na aba Ficha.":"")));}return j;
