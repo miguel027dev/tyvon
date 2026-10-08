@@ -1,6 +1,6 @@
 # TYVON Android — WebView
 
-URL: `https://rep-kky9.onrender.com/`. Android 7.0 (API24) ou posterior; versão1.1.0, código2.
+URL: `https://rep-kky9.onrender.com/`. Android 7.0 (API24) ou posterior; versão1.2.0, código3.
 
 ## Comportamento
 
@@ -32,3 +32,12 @@ As funcionalidades web carregadas do servidor recebem as atualizações de deplo
 `TYVON-1.1.0.apk` foi gerado com `assembleRelease`, otimizado pelo R8, alinhamento conferido com zipalign e assinado com apksigner usando a chave Android de testes. A variante de release desativa debuggable. `lintRelease` passou sem erros. Não houve teste em aparelho físico nesta entrega.
 
 A interface web passou nos 70 testes e build de produção. O servidor precisa da atualização de `src/main.jsx` para receber os eventos nativos de Voltar e Perfil.
+
+
+## WebViewer 1.2.0
+- A interface permanece no servidor Render e inclui uma camada de polimento apenas quando executada pelo Android TYVON WebViewer.
+- Cabeçalho nativo compacto, alvos de toque de 48 dp, safe areas do sistema e teclado, barra de status escura e haptics Android.
+- Voltar ou abrir Perfil durante uma sessão orientada abre confirmação de saída na interface, mantendo o rascunho.
+- Compatibilidade com gesto Android Voltar (API 33+) e rolagem sem rebote no WebView.
+- O APK compilado pelo GitHub Actions é uma **versão debug para testes**; não equivale a release assinado para Google Play.
+- Google login permanece no navegador externo; para entrar na WebView use e-mail e senha.
