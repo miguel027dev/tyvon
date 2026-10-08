@@ -41,6 +41,7 @@ export default function WorkoutSession({workout:w,logs=[],profile={},athleteName
  useEffect(()=>{const tick=()=>{const current=Date.now();setNow(current);const paused=pausedTotal.current+(pauseStarted.current?current-pauseStarted.current:0);setSeconds(Math.max(0,Math.floor((current-startedAt.current-paused)/1000)))};tick();const id=setInterval(tick,500);return()=>clearInterval(id)},[]);
  useEffect(()=>{const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous}},[]);
  useEffect(()=>{saveWorkoutDraft(localStorage,draftKey,{workout:w,index,checked,weights,reps,rirs,seconds,restEndsAt})},[draftKey,w,index,checked,weights,reps,rirs,seconds,restEndsAt]);
+ useEffect(()=>{const onNativeExit=()=>setConfirmClose(true);window.addEventListener('tyvon:request-exit-workout',onNativeExit);return()=>window.removeEventListener('tyvon:request-exit-workout',onNativeExit)},[]);
  const format=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`;
 
  function toggleRunning(){const current=Date.now();if(running){pauseStarted.current=current;setRunning(false)}else{if(pauseStarted.current)pausedTotal.current+=current-pauseStarted.current;pauseStarted.current=null;setRunning(true)}}

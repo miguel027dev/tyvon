@@ -1,0 +1,68 @@
+/* TYVON Android WebViewer presentation.
+   Activated ONLY by the signed application's user-agent suffix, not on the public web.
+   This layer intentionally preserves the current TYVON branding and application layout. */
+html.tyvon-android-shell{
+  color-scheme:dark;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior-y:none;
+  touch-action:pan-x pan-y;
+}
+html.tyvon-android-shell body{
+  overscroll-behavior-y:none;
+  min-height:100dvh;
+  background:#080808;
+}
+html.tyvon-android-shell .app,
+html.tyvon-android-shell .workspace{
+  min-height:100dvh;
+}
+html.tyvon-android-shell button,
+html.tyvon-android-shell [role="button"]{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+html.tyvon-android-shell input,
+html.tyvon-android-shell textarea,
+html.tyvon-android-shell select{
+  font-size:max(16px,1em);
+}
+html.tyvon-android-shell .workout-session,
+html.tyvon-android-shell .tyvon-splash,
+html.tyvon-android-shell .session-confirm{
+  overscroll-behavior:contain;
+}
+@media(max-width:850px){
+ html.tyvon-android-shell .app-dock{
+   padding-bottom:max(10px,env(safe-area-inset-bottom));
+ }
+ html.tyvon-android-shell .app-dock button{
+   min-width:44px;
+   min-height:50px;
+ }
+ html.tyvon-android-shell .chat-stage{
+   padding-top:0;
+   max-height:var(--chat-height,100dvh);
+ }
+ html.tyvon-android-shell .onboarding-flow{
+   padding-top:16px;
+ }
+ html.tyvon-android-shell .session-footer{
+   padding-bottom:max(12px,env(safe-area-inset-bottom));
+ }
+ html.tyvon-android-shell .session-footer button,
+ html.tyvon-android-shell .session-sets button,
+ html.tyvon-android-shell .reference-compose button{
+   min-height:48px;
+ }
+ html.tyvon-android-shell .session-body{
+   -webkit-overflow-scrolling:touch;
+   overscroll-behavior-y:contain;
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ html.tyvon-android-shell *,
+ html.tyvon-android-shell *::before,
+ html.tyvon-android-shell *::after{
+   scroll-behavior:auto!important;
+ }
+}
