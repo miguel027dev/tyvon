@@ -9,8 +9,8 @@
 @media(max-height:740px) and (max-width:850px){.entry-welcome .entry-companion{height:115px}.entry-welcome .entry-companion .tyvon-bot{width:165px;height:165px}.entry-content h1{font-size:33px}.entry-description{font-size:15px}.entry-eyebrow{margin-bottom:14px}.entry-facts{margin:18px 0}.entry-actions{gap:9px}.entry-assurance{margin-top:16px}.splash-film{width:210px;height:210px}}
 @media(prefers-reduced-motion:reduce){.tyvon-bot *, .splash-loader,.bot-thinking-light{animation:none!important;transition:none!important}.entry-primary,.entry-secondary,.account-signout{transition:none}}
 
-/* Canonical TYVON branding: preserve the source wordmark ratio and visually
-   remove its baked black canvas when placed on dark product surfaces. */
+/* Original TYVON wordmark exported with a real transparent SVG background.
+   Keep the image isolated from parent colors, including on glass surfaces. */
 .logo.tyvon-wordmark{
  display:inline-flex;
  align-items:center;
@@ -32,7 +32,7 @@
  border:0;
  border-radius:0;
  background:transparent;
- mix-blend-mode:screen;
+ mix-blend-mode:normal;
  user-select:none;
  -webkit-user-drag:none;
 }

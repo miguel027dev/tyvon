@@ -21,11 +21,11 @@ O motor TYVON é a única fonte de plano ativa.
 Adultos recebem fichas completas conforme a frequência:
 
 - 2 dias: dois treinos de corpo inteiro.
-- 3 dias: três treinos de corpo inteiro.
+- 3 dias: divisão Push / Pull / Pernas.
 - 4 dias: superiores/inferiores A/B.
 - 5 dias: Push/Pull/Pernas/Superiores/Inferiores.
 
-As sessões adultas usam aproximadamente seis exercícios por dia, respeitando os equipamentos disponíveis. Usuários de 14 a 17 anos usam uma programação mais conservadora, limitada a até três sessões de corpo inteiro, foco técnico e maior margem de repetições.
+As sessões adultas selecionam até 5 a 9 exercícios por dia conforme a duração prevista e os equipamentos disponíveis (podem ser menos quando a biblioteca não encontra alternativas). Usuários de 14 a 17 anos usam uma programação mais conservadora, limitada a até três sessões de corpo inteiro, foco técnico e maior margem de repetições.
 
 Cada série concluída pode registrar carga, repetições e RIR.
 
