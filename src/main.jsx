@@ -32,7 +32,7 @@ import './tyvon-glass.css';
 import {workoutDraftKey,readWorkoutDraft,clearWorkoutDraft,chatWorkoutDraftKey,readChatWorkoutDraft} from './workout-draft.js';
 
 // A dedicated WebViewer presentation layer: it never changes the public website.
-if(typeof document!=='undefined' && typeof navigator!=='undefined' && /TYVON-Android\\//.test(navigator.userAgent)){
+if(typeof document!=='undefined' && typeof navigator!=='undefined' && navigator.userAgent.includes('TYVON-Android/')){
  document.documentElement.classList.add('tyvon-android-shell');
 }
 
