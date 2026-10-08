@@ -322,7 +322,7 @@ public final class MainActivity extends Activity {
   }
   private void share(String workout,int count){
     Intent intent=new Intent(Intent.ACTION_SEND);intent.setType("text/plain");
-    intent.putExtra(Intent.EXTRA_TEXT","TYVON • "+workout+"\n"+count+" séries registradas.");startActivity(Intent.createChooser(intent,"Compartilhar"));
+    intent.putExtra(Intent.EXTRA_TEXT,"TYVON • "+workout+"\n"+count+" séries registradas.");startActivity(Intent.createChooser(intent,"Compartilhar"));
   }
   private void showHistory(){
     screen("HISTÓRICO");nav("Histórico");heading(stack,"SEU REGISTRO","Os números ficam.","Só mostramos séries efetivamente registradas.");
