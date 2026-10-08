@@ -58,7 +58,7 @@ public final class MainActivity extends Activity {
   private TextView text(String s,int size,int color,boolean bold){
     TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);
     t.setFontFeatureSettings("tnum");
-    t.setTypeface(android.graphics.Typeface.create(bold?"sans-serif-condensed":"sans-serif",bold?1:0));
+    t.setTypeface(android.graphics.Typeface.create(bold?"sans-serif-condensed":"sans-serif",bold?android.graphics.Typeface.BOLD:android.graphics.Typeface.NORMAL));
     t.setGravity(Gravity.CENTER_VERTICAL);
     return t;
   }
