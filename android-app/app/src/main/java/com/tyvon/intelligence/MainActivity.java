@@ -13,6 +13,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.RenderProcessGoneDetail;
@@ -45,6 +47,8 @@ public class MainActivity extends Activity {
     private byte[] pendingDownload;
     private String downloadNonce;
     private boolean backing;
+    private OnBackInvokedCallback predictiveBack;
+    private LinearLayout nativeToolbar;
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
@@ -53,25 +57,36 @@ public class MainActivity extends Activity {
         setTheme(R.style.Theme_Tyvon);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
+        if (Build.VERSION.SDK_INT >= 29) {
+            getWindow().setNavigationBarContrastEnforced(false);
+            getWindow().setStatusBarContrastEnforced(false);
+        }
+        getWindow().getDecorView().setSystemUiVisibility(0);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(LinearLayout.VERTICAL);
         shell.setBackgroundColor(Color.BLACK);
         LinearLayout toolbar = new LinearLayout(this);
+        nativeToolbar = toolbar;
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        toolbar.setBackgroundColor(Color.rgb(12, 12, 14));
+        toolbar.setBackgroundColor(Color.rgb(9, 9, 9));
+        toolbar.setPadding(dp(8),0,dp(8),0);
         Button back = toolbarButton("‹", "Voltar");
         back.setOnClickListener(v -> navigateBack());
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(52), dp(48)));
         TextView title = new TextView(this);
-        title.setText("TYVON"); title.setTextColor(Color.WHITE); title.setTextSize(17);
+        title.setText("TYVON"); title.setTextColor(Color.WHITE); title.setTextSize(15);
+        title.setLetterSpacing(0.07f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         toolbar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
         title.setGravity(Gravity.CENTER_VERTICAL);
         Button menu = toolbarButton("⋮", "Opções do aplicativo");
         menu.setOnClickListener(this::showOptions);
         toolbar.addView(menu, new LinearLayout.LayoutParams(dp(52), dp(48)));
-        shell.addView(toolbar);
+        shell.addView(toolbar, new LinearLayout.LayoutParams(-1,dp(48)));
+        View hairline = new View(this);
+        hairline.setBackgroundColor(Color.rgb(31,31,33));
+        shell.addView(hairline, new LinearLayout.LayoutParams(-1,dp(1)));
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
@@ -92,12 +107,17 @@ public class MainActivity extends Activity {
             shell.setFitsSystemWindows(true);
         }
         configureWebView();
+        if (Build.VERSION.SDK_INT >= 33) {
+            predictiveBack = () -> navigateBack();
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, predictiveBack);
+        }
         if (state == null || webView.restoreState(state) == null) webView.loadUrl(TYVON_URL);
     }
 
     private Button toolbarButton(String text, String description) {
         Button button = new Button(this);
-        button.setText(text); button.setTextSize(25); button.setTextColor(Color.WHITE);
+        button.setAllCaps(false);
+        button.setText(text); button.setTextSize(24); button.setTextColor(Color.rgb(235,235,235));
         button.setContentDescription(description); button.setBackgroundColor(Color.TRANSPARENT);
         button.setPadding(0, 0, 0, 0); button.setMinWidth(0); button.setMinimumWidth(0);
         return button;
@@ -124,7 +144,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSupportZoom(false); settings.setBuiltInZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " TYVON-Android/1.1");
+        settings.setUserAgentString(settings.getUserAgentString() + " TYVON-Android/1.2.0");
         if (Build.VERSION.SDK_INT >= 26) settings.setSafeBrowsingEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
@@ -188,7 +208,7 @@ public class MainActivity extends Activity {
                 case 2: navigateTo("profile"); break;
                 case 3: new AlertDialog.Builder(this).setTitle("Recarregar TYVON?").setMessage("A sessão da conta é mantida. O rascunho do treino salvo neste aparelho será retomado pela aplicação.").setNegativeButton("Cancelar", null).setPositiveButton("Recarregar", (d, w) -> webView.reload()).show(); break;
                 case 4: external(Uri.parse(onTrustedPage() ? webView.getUrl() : TYVON_URL)); break;
-                case 5: new AlertDialog.Builder(this).setTitle("TYVON 1.1").setMessage("Aplicativo WebView conectado ao TYVON. Requer internet. Conta, perfil, histórico e saída da sessão ficam nas opções do TYVON. Login Google utiliza o navegador; a sessão do navegador é separada da sessão do aplicativo.").setPositiveButton("Entendi", null).show(); break;
+                case 5: new AlertDialog.Builder(this).setTitle("TYVON 1.2").setMessage("Aplicativo WebView conectado ao TYVON. Requer internet. Conta, perfil, histórico e saída da sessão ficam nas opções do TYVON. Login Google utiliza o navegador; a sessão do navegador é separada da sessão do aplicativo.").setPositiveButton("Entendi", null).show(); break;
             }
             return true;
         });
@@ -257,6 +277,10 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy() {
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         pendingDownload = null; downloadNonce = null;
+        if (Build.VERSION.SDK_INT >= 33 && predictiveBack != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(predictiveBack);
+            predictiveBack = null;
+        }
         if (webView != null) { webView.stopLoading(); webView.removeJavascriptInterface("TyvonDownloads"); webView.destroy(); webView = null; }
         super.onDestroy();
     }
