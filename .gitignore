@@ -16,7 +16,3 @@ coverage/
 *.aab
 android-app/.gradle/
 android-app/app/build/
-
-android-native/build/
-*.keystore
-*.jks

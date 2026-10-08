@@ -12,7 +12,6 @@ from backend.chat import chat_bp
 from backend.db import DatabaseUnavailable, ping_db
 from backend.logging_utils import log_event
 from backend.privacy import privacy_bp
-from backend.native import native_bp
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
@@ -26,7 +25,6 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(account_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(privacy_bp)
-app.register_blueprint(native_bp)
 
 
 @app.before_request

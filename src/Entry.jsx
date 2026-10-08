@@ -7,7 +7,7 @@ import {apiFetch} from './api.js';
 
 export default function Entry({blocked=false,Logo,user,profile,loading,error,onRetry,onStart,onContinue,onImport,legacy,saveError,onSaveRetry,onAuthenticate,onSignOut,onDashboard}){
  const params=new URLSearchParams(location.search),resetToken=params.get('reset_token')||'';
- const [view,setView]=useState(resetToken?'reset':params.get('view')==='forgot'?'forgot':'welcome'),[accepted,setAccepted]=useState(false),[busy,setBusy]=useState(false),[formError,setFormError]=useState('');
+ const [view,setView]=useState(resetToken?'reset':'welcome'),[accepted,setAccepted]=useState(false),[busy,setBusy]=useState(false),[formError,setFormError]=useState('');
  const [showPassword,setShowPassword]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState(''),[google,setGoogle]=useState(false),[recoveryMessage,setRecoveryMessage]=useState('');
 
  useEffect(()=>{fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json()).then(d=>setGoogle(d.google)).catch(()=>{});if(params.has('auth_error'))setFormError('Não foi possível entrar com Google. Tente novamente ou use e-mail e senha.');if(params.get('email_verified')==='1')setRecoveryMessage('E-mail confirmado. Sua conta está protegida.');if(params.get('email_verified')==='0')setFormError('Esse link de verificação expirou ou já foi usado.')},[]);
